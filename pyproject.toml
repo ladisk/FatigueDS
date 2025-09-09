@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "FatigueDS"
-version = "0.2.0"
+version = "0.3.0"
 maintainers = [
     { name = "Jaša Šonc, Janko Slavič", email = "jasasonc@gmail.com" },
 ]
