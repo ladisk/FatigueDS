@@ -26,9 +26,9 @@ copyright = '2025, Jaša Šonc, Martin Česnik, Rok Pavlin, Janko Slavič'
 author = 'Jaša Šonc, Martin Česnik, Rok Pavlin, Janko Slavič'
 
 # The short X.Y version
-version = '0.2'
+version = '0.3'
 # The full version, including alpha/beta/rc tags
-release = '0.2.0'
+release = '0.3.0'
 
 
 # -- General configuration ---------------------------------------------------
