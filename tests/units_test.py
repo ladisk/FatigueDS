@@ -28,34 +28,34 @@ class TestUnits:
         t = time_data[:,0] 
         dt = t[2] - t[1]
 
-        sd_g = FatigueDS.SpecificationDevelopment(freq_data=(20, 200, 5))  # time history (psd averaging)
-        sd_ms2 = FatigueDS.SpecificationDevelopment(freq_data=(20, 200, 5))  # time history (psd averaging)
+        load_spectrum_g = FatigueDS.Spectrum(freq_data=(20, 200, 5))  # time history (psd averaging)
+        load_spectrum_ms2 = FatigueDS.Spectrum(freq_data=(20, 200, 5))  # time history (psd averaging)
 
-        sd_g.set_random_load((time_history_data, dt), unit='g')  # (time history, dt)
-        sd_ms2.set_random_load((time_history_data * 9.81, dt), unit='ms2')  # (time history, dt)
+        load_spectrum_g.set_random_load((time_history_data, dt), unit='g')  # (time history, dt)
+        load_spectrum_ms2.set_random_load((time_history_data * 9.81, dt), unit='ms2')  # (time history, dt)
 
-        sd_g.get_ers()
-        sd_ms2.get_ers()
+        load_spectrum_g.get_ers()
+        load_spectrum_ms2.get_ers()
 
-        sd_g.get_fds(k=5, C=1, p=1)
-        sd_ms2.get_fds(k=5, C=1, p=1)
+        load_spectrum_g.get_fds(k=5, C=1, p=1)
+        load_spectrum_ms2.get_fds(k=5, C=1, p=1)
 
-        assert np.allclose(sd_g.ers * 9.81, sd_ms2.ers)
-        assert np.allclose(sd_g.fds, sd_ms2.fds)
+        assert np.allclose(load_spectrum_g.ers * 9.81, load_spectrum_ms2.ers)
+        assert np.allclose(load_spectrum_g.fds, load_spectrum_ms2.fds)
 
     def test_units_psd(self):
         _psd_data = np.load('test_data/test_psd.npy', allow_pickle=True)
         psd_freq = _psd_data[:,0]
         psd_data = _psd_data[:,1]
 
-        sd_PSD_g = FatigueDS.SpecificationDevelopment(freq_data=(20, 200, 5))
-        sd_PSD_ms2 = FatigueDS.SpecificationDevelopment(freq_data=(20, 200, 5))
-        sd_PSD_g.set_random_load((psd_data, psd_freq), unit='g', T=133.5711234541)
-        sd_PSD_ms2.set_random_load((psd_data * 9.81**2, psd_freq), unit='ms2', T=133.5711234541)
-        sd_PSD_g.get_ers()
-        sd_PSD_ms2.get_ers()
-        sd_PSD_g.get_fds(k=5, C=1, p=1)
-        sd_PSD_ms2.get_fds(k=5, C=1, p=1)
+        load_spectrum_psd_g = FatigueDS.Spectrum(freq_data=(20, 200, 5))
+        load_spectrum_psd_ms2 = FatigueDS.Spectrum(freq_data=(20, 200, 5))
+        load_spectrum_psd_g.set_random_load((psd_data, psd_freq), unit='g', T=133.5711234541)
+        load_spectrum_psd_ms2.set_random_load((psd_data * 9.81**2, psd_freq), unit='ms2', T=133.5711234541)
+        load_spectrum_psd_g.get_ers()
+        load_spectrum_psd_ms2.get_ers()
+        load_spectrum_psd_g.get_fds(k=5, C=1, p=1)
+        load_spectrum_psd_ms2.get_fds(k=5, C=1, p=1)
 
-        assert np.allclose(sd_PSD_g.ers * 9.81, sd_PSD_ms2.ers)
-        assert np.allclose(sd_PSD_g.fds, sd_PSD_ms2.fds)        
+        assert np.allclose(load_spectrum_psd_g.ers * 9.81, load_spectrum_psd_ms2.ers)
+        assert np.allclose(load_spectrum_psd_g.fds, load_spectrum_psd_ms2.fds)

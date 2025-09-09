@@ -17,14 +17,14 @@ Import the required packages
     import matplotlib.pyplot as plt
 
 
-Instantiate SpecificationDevelopment object
+Instantiate Spectrum object
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-SpecificationDevelopment object contains data, required for the calculation of extreme response spectrum (ERS) and fatigue damage spectrum (FDS).
+Spectrum object contains data, required for the calculation of extreme response spectrum (ERS) and fatigue damage spectrum (FDS).
 
 .. code-block:: python
 
-    sd_1 = FatigueDS.SpecificationDevelopment(freq_data=(0, 2000, 5), damp=0.1)
+    load_spectrum_1 = FatigueDS.Spectrum(freq_data=(0, 2000, 5), damp=0.1)
 
 Set the sine load
 ~~~~~~~~~~~~~~~~~~
@@ -41,7 +41,7 @@ Set the sine load with the following parameters:
 
 .. code-block:: python
 
-    sd_1.set_sine_load(sine_freq=500, amp=10, t_total=3600, exc_type='acc')
+    load_spectrum_1.set_sine_load(sine_freq=500, amp=10, t_total=3600, exc_type='acc')
 
 Calculate the ERS and FDS
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -50,8 +50,8 @@ Calculate the ERS and FDS. For the FDS calculation, the additional mateiral fati
 
 .. code-block:: python
 
-    sd_1.get_ers()
-    sd_1.get_fds(k=10, C=1e80, p=6.3 * 1e10)
+    load_spectrum_1.get_ers()
+    load_spectrum_1.get_fds(k=10, C=1e80, p=6.3 * 1e10)
 
 Plot the results
 ~~~~~~~~~~~~~~~~~
@@ -60,29 +60,29 @@ Plot the ERS and FDS results.
 
 .. code-block:: python
 
-    sd_1.plot_ers(label='sine')
-    sd_1.plot_fds(label='sine')
+    load_spectrum_1.plot_ers(label='sine')
+    load_spectrum_1.plot_fds(label='sine')
 
 Or access the results directly:
 
 .. code-block:: python
 
-    sd_1.ers
-    sd_1.fds
-    sd_1.f0_range  # frequency vector
+    load_spectrum_1.ers
+    load_spectrum_1.fds
+    load_spectrum_1.f0_range  # frequency vector
 
 
 Sine-sweep signal
 ------------------
 
-Instantiate SpecificationDevelopment object
+Instantiate Spectrum object
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-SpecificationDevelopment object contains data, required for the calculation of extreme response spectrum (ERS) and fatigue damage spectrum (FDS).
+Spectrum object contains data, required for the calculation of extreme response spectrum (ERS) and fatigue damage spectrum (FDS).
 
 .. code-block:: python
 
-    sd_2 = FatigueDS.SpecificationDevelopment(freq_data=(0, 2000, 5), damp=0.1)
+    load_spectrum_2 = FatigueDS.Spectrum(freq_data=(0, 2000, 5), damp=0.1)
 
 
 Set the sine-sweep load
@@ -104,7 +104,7 @@ Set the sine-sweep load with the following parameters:
 
 .. code-block:: python
 
-    sd_2.set_sine_sweep_load(const_amp=[5, 10, 20], const_f_range=[20, 100, 500, 1000], exc_type='acc', dt=1, sweep_type='log', sweep_rate=1)
+    load_spectrum_2.set_sine_sweep_load(const_amp=[5, 10, 20], const_f_range=[20, 100, 500, 1000], exc_type='acc', dt=1, sweep_type='log', sweep_rate=1)
 
 
 Calculate the ERS and FDS
@@ -114,8 +114,8 @@ Calculate the ERS and FDS. For the FDS calculation, the additional mateirla fati
 
 .. code-block:: python
 
-    sd_2.get_ers()
-    sd_2.get_fds(k=10, C=1e80, p=6.3 * 1e10)
+    load_spectrum_2.get_ers()
+    load_spectrum_2.get_fds(k=10, C=1e80, p=6.3 * 1e10)
 
 Plot the results
 ~~~~~~~~~~~~~~~~~
@@ -124,8 +124,8 @@ Plot the ERS and FDS results.
 
 .. code-block:: python
 
-    sd_2.plot_ers(label='sine sweep')
-    sd_2.plot_fds(label='sine sweep')
+    load_spectrum_2.plot_ers(label='sine sweep')
+    load_spectrum_2.plot_fds(label='sine sweep')
 
     plt.show()
 
@@ -133,6 +133,6 @@ Or access the results directly:
 
 .. code-block:: python
 
-    sd_2.ers
-    sd_2.fds
-    sd_2.f0_range  # frequency vector
+    load_spectrum_2.ers
+    load_spectrum_2.fds
+    load_spectrum_2.f0_range  # frequency vector

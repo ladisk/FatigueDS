@@ -1,17 +1,17 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import scipy.integrate
 from scipy.special import gamma
 import rainflow
+from tqdm import tqdm
 
 from . import tools
-from . import signals
 
-
-class SpecificationDevelopment:
+class Spectrum:
 
     def __init__(self, freq_data=(10, 2000, 5), damp=None, Q=10):
         """
-        Initialize the SpecificationDevelopment class. Frequency range and damping ratio/Q-factor must be provided.
+        Initialize the Spectrum class. Frequency range and damping ratio/Q-factor must be provided.
         Only one of the damping ratio or Q-factor must be provided. If both are provided, damping ratio will be used. If None, Q=10 will be used.
 
         :param freq_data: tuple containing (f0_start, f0_stop, f0_step) [Hz] or a frequency vector, defining the range where the ERS and FDS will be calculated
@@ -182,20 +182,20 @@ class SpecificationDevelopment:
 
         """        
         if self.signal_type == 'sine':
-            self.ers = signals.sine(self, output='ERS')
+            self.ers = self._get_sine_ers_fds(output='ERS')
         
         if self.signal_type == 'sine_sweep':
-            self.ers = signals.sine_sweep(self, output='ERS')
+            self.ers = self._get_sine_sweep_ers_fds(output='ERS')
         
         if self.signal_type == 'random_psd':
-            self.ers = signals.random_psd(self, output='ERS')
+            self.ers = self._get_random_psd_ers_fds(output='ERS')
         
         if self.signal_type == 'random_time':
             if self.method == 'convolution':
-                self.ers = signals.random_time(self, output='ERS')   
+                self.ers = self._get_random_time_ers_fds(output='ERS')
             elif self.method == 'psd_averaging':
                 tools.psd_averaging(self)
-                self.ers = signals.random_psd(self, output='ERS')
+                self.ers = self._get_random_psd_ers_fds(output='ERS')
                 
 
 
@@ -241,20 +241,20 @@ class SpecificationDevelopment:
             raise ValueError('Material parameters: k, C and p must be provided')
 
         if self.signal_type == 'sine':
-            self.fds = signals.sine(self, output='FDS')
-        
+            self.fds = self._get_sine_ers_fds(output='FDS')
+
         if self.signal_type == 'sine_sweep':
-            self.fds = signals.sine_sweep(self, output='FDS')
-        
+            self.fds = self._get_sine_sweep_ers_fds(output='FDS')
+
         if self.signal_type == 'random_psd':
-            self.fds = signals.random_psd(self, output='FDS')
+            self.fds = self._get_random_psd_ers_fds(output='FDS')
 
         if self.signal_type == 'random_time':
             if self.method == 'convolution':
-                self.fds = signals.random_time(self, output='FDS')   
+                self.fds = self._get_random_time_ers_fds(output='FDS')   
             elif self.method == 'psd_averaging':
                 tools.psd_averaging(self)
-                self.fds = signals.random_psd(self, output='FDS')
+                self.fds = self._get_random_psd_ers_fds(output='FDS')
 
 
     def plot_ers(self, new_figure=True, grid=True, *args, **kwargs):
@@ -305,9 +305,156 @@ class SpecificationDevelopment:
             else:
                 plt.grid(visible=False)
         else:  
-            raise ValueError('FDS not calculated. Run get_fds method first')  
+            raise ValueError('FDS not calculated. Run get_fds method first')
+        
 
+    def _get_sine_ers_fds(self, output=None):
+        """
+        Internal function for calculating ERS and FDS of a sine signal.
+        """
 
+        omega_0i = 2 * np.pi * self.f0_range
+
+        # Getting the ERS with self.get_ers()
+        if output == 'ERS':
+
+            R_i = -self.amp * (omega_0i)**self.a / (np.sqrt((1 - (self.sine_freq / self.f0_range)**2)**2 + (self.sine_freq / (self.Q * self.f0_range))**2))
+            return np.abs(R_i) 
+
+        # Getting the FDS with self.get_fds()
+        elif output == 'FDS':
+
+            if not hasattr(self, 't_total'):
+                raise ValueError('Missing parameter `t_total`.')
+
+            h = self.sine_freq / self.f0_range
+            D_i = self.p**self.k / self.C * self.f0_range * self.t_total * self.amp**self.k * omega_0i**(self.k * (self.a - 2)) * h**(self.a * self.k + 1) / ((1 - h**2)**2 + (h / self.Q)**2)**(self.k / 2)
+            return D_i
+        
+    def _get_sine_sweep_ers_fds(self, output=None):
+        """
+        Internal function for calculating ERS and FDS of a sine sweep signal.
+        """
+        
+        R_i_all = np.zeros((len(self.f0_range), len(self.const_amp)))
+        fds = np.zeros(len(self.f0_range))
+        ers = np.zeros(len(self.f0_range))
+        
+        for i in range(len(self.f0_range)):
+            omega_0i = 2 * np.pi * self.f0_range[i]
+
+            for n in range(len(self.const_amp)):
+                amp = self.const_amp[n]
+                f1 = self.const_f_range[n]
+                f2 = self.const_f_range[n + 1]
+                h1 = f1 / self.f0_range[i]
+                h2 = f2 / self.f0_range[i]
+
+                if output == 'FDS':
+                    if self.sweep_type is None:
+                        raise ValueError("You need to provide either ['linear','lin'] or ['logarithmic','log'] sweep_type.")
+                    elif self.sweep_type in ['lin', 'linear']:
+                        tb = (self.const_f_range[-1] - self.const_f_range[0]) / self.sweep_rate * 60  # sinusoidal sweep time [s] -> from [Hz/min]
+                        dh = (f2 - f1) * self.dt / (self.f0_range[i] * tb)
+                        h = np.arange(h1, h2, dh)
+                        M_h = h**2 / (h2 - h1)
+                    elif self.sweep_type in ['log', 'logarithmic']:
+                        tb = 60 * np.log(self.const_f_range[-1] / self.const_f_range[0]) / (self.sweep_rate * np.log(2))  # logarithmic sweep time [s] -> from [oct./min]
+                        t = np.arange(0, tb, self.dt)
+                        T1 = tb / np.log(h2 / h1)
+                        f_t = f1 * np.exp(t / T1)
+                        dh = f1 / (T1 * self.f0_range[i]) * np.exp(t / T1) * self.dt
+                        h = f_t / self.f0_range[i]
+                        M_h = h / (np.log(h2 / h1))
+                    else:
+                        raise ValueError(f"Invalid method `method`='{self.sweep_type}'. Supported sweep types: 'lin' and 'log'.")
+                
+                    const = self.p**self.k / self.C * self.f0_range[i] * tb * amp**self.k * omega_0i**(self.k * (self.a - 2))
+                    integral = scipy.integrate.trapezoid(M_h * h**(self.a * self.k - 1) / ((1 - h**2)**2 + (h / self.Q)**2)**(self.k / 2), x=h)
+                    fds[i] += const * integral
+
+                elif output == 'ERS':
+                    if self.f0_range[i] <= f1:
+                        Omega_1 = 2 * np.pi * f1
+                        R_i = Omega_1**self.a * amp / (np.sqrt((1 - h1**2)**2 + (h1 / self.Q)**2))  # page 32/501 eq. [1.22]
+                    elif self.f0_range[i] >= f2:
+                        Omega_2 = 2 * np.pi * f2
+                        R_i = Omega_2**self.a * amp / (np.sqrt((1 - h2**2)**2 + (h2 / self.Q)**2))  # page 32/501 eq. [1.23]
+                    else:
+                        R_i = omega_0i**self.a * amp * self.Q  # page 31/501 eq. [1.21] 
+                    R_i_all[i, n] = R_i
+
+            ers[i] = max(R_i_all[i, :])
+        
+        if output == 'ERS':
+            return ers
+        elif output == 'FDS':
+            return fds
+
+    def _get_random_psd_ers_fds(self, output=None):
+        """
+        Internal function for calculating ERS and FDS of a random signal in frequency domain.
+        """
+        
+        fds = np.zeros(len(self.f0_range))
+        ers = np.zeros(len(self.f0_range))     
+        
+        # constants
+        C0 = np.pi / (4 * self.damp)
+        C_disp = C0 * 1 / ((2 * np.pi)**4 * self.f0_range**3)
+        C_vel = C0 * 1 / ((2 * np.pi)**2 * self.f0_range)
+        C_acc = C0 * self.f0_range
+
+        # rms sums
+        z_rms_2 = tools.rms_sum(f_0=self.f0_range, psd_freq=self.psd_freq, psd_data=self.psd_data, damp=self.damp, motion='rel_disp') * C_disp
+        z_rms = np.sqrt(z_rms_2)
+        
+        dz_rms_2 = tools.rms_sum(f_0=self.f0_range, psd_freq=self.psd_freq, psd_data=self.psd_data, damp=self.damp, motion='rel_vel') * C_vel
+        dz_rms = np.sqrt(dz_rms_2)
+        
+        if output == 'FDS':  # ddz only needed for FDS calculation
+            ddz_rms_2 = tools.rms_sum(f_0=self.f0_range, psd_freq=self.psd_freq, psd_data=self.psd_data, damp=self.damp, motion='rel_acc') * C_acc 
+            ddz_rms = np.sqrt(np.abs(ddz_rms_2)) * self.unit_scale
+
+        # ERS calculation
+        if output == 'ERS':
+            n0 = 1 / np.pi * dz_rms / z_rms
+            ers = (2 * np.pi * self.f0_range)**2 * z_rms * np.sqrt(2 * np.log(n0 * self.T))
+            return ers
+        
+        # FDS calculation (damage according to Vol. 0, page 89/198, equation (A1-93))
+        elif output == 'FDS':
+            z_rms *= self.unit_scale
+            dz_rms *= self.unit_scale
+            n0 = 1 / np.pi * dz_rms / z_rms
+            fds = self.p**self.k / self.C * n0 * self.T * (z_rms * np.sqrt(2))**self.k * gamma(1 + self.k / 2)
+            return fds
+        
+    def _get_random_time_ers_fds(self, output=None):
+        """
+        Internal function for calculating ERS and FDS of a sine random signal in time domain.
+        """
+
+        if output == 'ERS':
+            ers = np.zeros(len(self.f0_range))
+            for i in tqdm(range(len(self.f0_range))):               
+                z = tools.response_relative_displacement(self.time_data, self.dt, f_0=self.f0_range[i], damp=self.damp)
+                R_i = np.max(z) * (2 * np.pi * self.f0_range[i])**2 
+                ers[i] = R_i
+            return ers
+        
+        if output == 'FDS':
+            fds = np.zeros(len(self.f0_range))
+            
+            for i in tqdm(range(len(self.f0_range))):                    
+                z = tools.response_relative_displacement(self.time_data * self.unit_scale, self.dt, f_0=self.f0_range[i], damp=self.damp)
+                
+                rf = rainflow.count_cycles(z)
+                rf = np.asarray(rf)
+                cyc_sum = np.sum(rf[:,1] * 2 * (rf[:,0] / 2)**self.k)  # *2 and /2 because rainflow returns cycles and ranges, fds theory is defined for half cycles and amplitudes
+                D_i = self.p**self.k / (self.C) * cyc_sum
+                fds[i] = D_i
+            return fds
 
 
         

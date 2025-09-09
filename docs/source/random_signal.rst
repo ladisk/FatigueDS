@@ -14,10 +14,10 @@ Import the required packages
     import matplotlib.pyplot as plt
     import pyExSi as es
 
-SpecificationDevelopment object
+Spectrum object
 -------------------------------
 
-The SpecificationDevelopment object contains the data required for the calculation of the Extreme Response Spectrum (ERS) and the Fatigue Damage Spectrum (FDS). It enables calculations for random signals that are defined using either the PSD or time-history.
+The Spectrum object contains the data required for the calculation of the Extreme Response Spectrum (ERS) and the Fatigue Damage Spectrum (FDS). It enables calculations for random signals that are defined using either the PSD or time-history.
 For time-history signals, two methods are available. ERS and FDS can be determined directly from time history using convolution, or by first converting the history into PSD and calculating spectra from the PSD.
 
 This example demonstrates ERS and FDS calculations using all three available methods:
@@ -74,7 +74,7 @@ Plot the generated signal:
     plt.ylabel('m/s²')
     plt.show()
 
-Instantiate the SpecificationDevelopment object
+Instantiate the Spectrum object
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Object is instantiated with inputs:
@@ -87,9 +87,9 @@ Three objects are instantiated for comparison of all three methods:
 
 .. code-block:: python
     
-    sd_1 = FatigueDS.SpecificationDevelopment(freq_data=(100, 1100, 20), damp=0.05)  # PSD
-    sd_2 = FatigueDS.SpecificationDevelopment(freq_data=(100, 1100, 20), damp=0.05)  # Time history (convolution)
-    sd_3 = FatigueDS.SpecificationDevelopment(freq_data=(100, 1100, 20), damp=0.05)  # Time history (psd averaging)
+    load_spectrum_1 = FatigueDS.Spectrum(freq_data=(100, 1100, 20), damp=0.05)  # PSD
+    load_spectrum_2 = FatigueDS.Spectrum(freq_data=(100, 1100, 20), damp=0.05)  # Time history (convolution)
+    load_spectrum_3 = FatigueDS.Spectrum(freq_data=(100, 1100, 20), damp=0.05)  # Time history (psd averaging)
 
 Set the random load
 ~~~~~~~~~~~~~~~~~~~
@@ -108,9 +108,9 @@ If time history is given as input, method of spectra calculation must also be de
 
 .. code-block:: python
 
-    sd_1.set_random_load((PSD_flat, freq_flat), unit='ms2', T=500)  # input is tuple (psd array, freq array)
-    sd_2.set_random_load((gaussian_signal, 1 / fs), unit='ms2', method='convolution')  # input is tuple (psd data, frequency vector)
-    sd_3.set_random_load((gaussian_signal, 1 / fs), unit='ms2', method='psd_averaging', bins=500)  # input is tuple (psd data, frequency vector)
+    load_spectrum_1.set_random_load((PSD_flat, freq_flat), unit='ms2', T=500)  # input is tuple (psd array, freq array)
+    load_spectrum_2.set_random_load((gaussian_signal, 1 / fs), unit='ms2', method='convolution')  # input is tuple (psd data, frequency vector)
+    load_spectrum_3.set_random_load((gaussian_signal, 1 / fs), unit='ms2', method='psd_averaging', bins=500)  # input is tuple (psd data, frequency vector)
 
 Get the ERS and FDS
 ~~~~~~~~~~~~~~~~~~~~
@@ -119,25 +119,25 @@ ERS and FDS are calculated with the ``get_ers`` and ``get_fds`` methods. For the
 
 .. code-block:: python
     
-    sd_1.get_ers()
-    sd_2.get_ers()
-    sd_3.get_ers()
+    load_spectrum_1.get_ers()
+    load_spectrum_2.get_ers()
+    load_spectrum_3.get_ers()
 
     k = 10
     C = 1e80
     p = 6.3 * 1e10
 
-    sd_1.get_fds(k=k, C=C, p=p)
-    sd_2.get_fds(k=k, C=C, p=p)
-    sd_3.get_fds(k=k, C=C, p=p)
+    load_spectrum_1.get_fds(k=k, C=C, p=p)
+    load_spectrum_2.get_fds(k=k, C=C, p=p)
+    load_spectrum_3.get_fds(k=k, C=C, p=p)
 
 The results are stored in the ``ers`` and ``fds`` attributes of the object, while the frequency vector is stored in the ``f0_range`` attribute.
 
 .. code-block:: python
 
-    sd_1.ers
-    sd_1.fds
-    sd_1.f0_range
+    load_spectrum_1.ers
+    load_spectrum_1.fds
+    load_spectrum_1.f0_range
 
 Plot the results
 ~~~~~~~~~~~~~~~~
@@ -146,12 +146,12 @@ ERS and FDS are plotted for all three methods.
 
 .. code-block:: python
 
-    sd_1.plot_ers(label='PSD')
-    sd_2.plot_ers(new_figure=False, label='Time history (convolution)')
-    sd_3.plot_ers(new_figure=False, label='Time history (PSD averaging)')
+    load_spectrum_1.plot_ers(label='PSD')
+    load_spectrum_2.plot_ers(new_figure=False, label='Time history (convolution)')
+    load_spectrum_3.plot_ers(new_figure=False, label='Time history (PSD averaging)')
 
-    sd_1.plot_fds(label='PSD')
-    sd_2.plot_fds(new_figure=False, label='Time history (convolution)')
-    sd_3.plot_fds(new_figure=False, label='Time history (PSD averaging)')
+    load_spectrum_1.plot_fds(label='PSD')
+    load_spectrum_2.plot_fds(new_figure=False, label='Time history (convolution)')
+    load_spectrum_3.plot_fds(new_figure=False, label='Time history (PSD averaging)')
 
 
