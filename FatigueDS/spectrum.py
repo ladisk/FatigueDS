@@ -12,9 +12,11 @@ class Spectrum:
     def __init__(self, freq_data=(10, 2000, 5), damp=None, Q=10):
         """
         Initialize the Spectrum class. Frequency range and damping ratio/Q-factor must be provided.
-        Only one of the damping ratio or Q-factor must be provided. If both are provided, damping ratio will be used. If None, Q=10 will be used.
+        Only one of the damping ratio or Q-factor must be provided. If both are provided, damping ratio will be used. 
+        If None, Q=10 will be used.
 
-        :param freq_data: tuple containing (f0_start, f0_stop, f0_step) [Hz] or a frequency vector, defining the range where the ERS and FDS will be calculated
+        :param freq_data: tuple containing (f0_start, f0_stop, f0_step) [Hz] or a frequency vector, defining the range 
+        where the ERS and FDS will be calculated
         :param damp: damping ratio [/]
         :param Q: damping Q-factor [/] (default: Q=10)
         """
@@ -126,7 +128,8 @@ class Spectrum:
         :param signal_data: tuple containing (time history data, dt) or (psd data, frequency vector)
         :param T: time duration [s]
         :param unit: unit of the signal (supported: 'g' and 'ms2') Parameter only needed for fds calculation
-        :param method: method to calculate ERS and FDS (supported: 'convolution' and 'psd_averaging'). Only needed for random time signal
+        :param method: method to calculate ERS and FDS (supported: 'convolution' and 'psd_averaging'). 
+                       Only needed for random time signal
         :param bins: number of bins for PSD averaging method. Only neede for psd averaging method
         """
 
@@ -209,14 +212,17 @@ class Spectrum:
         
         where ``N`` is the number of cycles and ``s`` is the stress amplitude.
 
-        Additionally, constant ``p`` (proportionality between peak stress and maximum relative displacement) must be provided, as defined by:
+        Additionally, constant ``p`` (proportionality between peak stress and maximum relative displacement) 
+        must be provided, as defined by:
 
         ``sigma_p = p * z_p``
 
-        Correct unit must be selected in `set_random_load` method. If unit is ``g``, signal is scaled to ``m/s^2`` before FDS calculation, because the FDS theory is based on SI base units.
+        Correct unit must be selected in `set_random_load` method. If unit is ``g``, signal is scaled to ``m/s^2`` 
+        before FDS calculation, because the FDS theory is based on SI base units.
 
         NOTE:
-        Naming of material parameters slightly differs from the notation in literature by Lalanne [1] (``b,C,K`` -> ``k,C,p``). This is done due to the consistency with the established package in this ecosystem (FLife <https://github.com/ladisk/FLife>).
+        Naming of material parameters slightly differs from the notation in literature by Lalanne [1] (``b,C,K`` -> ``k,C,p``). 
+        This is done due to the consistency with the established package in this ecosystem (FLife <https://github.com/ladisk/FLife>).
 
         Alternative material parameters
         -------------------------------
