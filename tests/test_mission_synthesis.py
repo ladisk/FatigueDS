@@ -71,3 +71,55 @@ def test_invert_acceleration_scaling():
     g_full = invert_fds_to_psd(fds, f0, k=k, C=1.0, p=1.0, Q=10, T_test=3600.0)
     g_fast = invert_fds_to_psd(fds, f0, k=k, C=1.0, p=1.0, Q=10, T_test=360.0)
     assert np.allclose(g_fast / g_full, 10 ** (2 / k))
+
+
+from FatigueDS.mission_synthesis import MissionSynthesis
+
+
+def _make_event(freq_range=(20, 200, 5), amp=10.0):
+    s = FatigueDS.Spectrum(freq_data=freq_range)
+    s.set_sine_load(sine_freq=100, amp=amp, t_total=3600)
+    s.get_ers()
+    s.get_fds(k=5, C=1, p=1)
+    return s
+
+
+def test_combine_two_events_sum_and_envelope():
+    e1 = _make_event(amp=10.0)
+    e2 = _make_event(amp=10.0)
+    ms = MissionSynthesis([e1, e2])
+    ms.combine()
+    assert np.allclose(ms.fds_ref, 2 * e1.fds)
+    assert np.allclose(ms.ers_ref, np.maximum(e1.ers, e2.ers))
+    assert np.allclose(ms.f0_range, e1.f0_range)
+
+
+def test_combine_repeats():
+    e1 = _make_event(amp=10.0)
+    ms = MissionSynthesis()
+    ms.add_event(e1, repeats=3)
+    ms.combine()
+    assert np.allclose(ms.fds_ref, 3 * e1.fds)
+
+
+def test_combine_f0_mismatch_raises():
+    e1 = _make_event(freq_range=(20, 200, 5))
+    e2 = _make_event(freq_range=(20, 300, 5))
+    ms = MissionSynthesis([e1, e2])
+    with pytest.raises(ValueError):
+        ms.combine()
+
+
+def test_add_event_bad_repeats():
+    ms = MissionSynthesis()
+    with pytest.raises(ValueError):
+        ms.add_event(_make_event(), repeats=0)
+
+
+def test_combine_missing_fds_raises():
+    s = FatigueDS.Spectrum(freq_data=(20, 200, 5))
+    s.set_sine_load(sine_freq=100, amp=10.0, t_total=3600)
+    s.get_ers()  # no get_fds -> no .fds
+    ms = MissionSynthesis([s])
+    with pytest.raises(ValueError):
+        ms.combine()

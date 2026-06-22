@@ -72,3 +72,49 @@ def invert_fds_to_psd(fds_ref, f0_range, k, C, p, Q, T_test):
     inner = C * fds_ref[mask] / (p**k * f0[mask] * T_test * gamma(1 + k / 2))
     psd[mask] = (2 * w0[mask]**3 / Q) * inner**(2 / k)
     return psd
+
+
+class MissionSynthesis:
+    """Combine the FDS/ERS of several Spectrum events into reference curves and
+    invert the reference FDS into an equivalent accelerated test PSD.
+
+    All events must share the same (uniformly spaced) f0_range.
+    """
+
+    def __init__(self, events=None):
+        """:param events: optional list of Spectrum (each with .fds and .ers computed)"""
+        self.events = []
+        if events is not None:
+            for ev in events:
+                self.add_event(ev)
+
+    def add_event(self, spectrum, repeats=1):
+        """Append a field event.
+
+        :param spectrum: a Spectrum instance with .fds and .ers computed
+        :param repeats: occurrence multiplier in the life profile (> 0)
+        """
+        if repeats <= 0:
+            raise ValueError("repeats must be positive")
+        self.events.append((spectrum, float(repeats)))
+        return self
+
+    def combine(self):
+        """Build reference curves: fds_ref = sum(repeats*fds), ers_ref = max(ers)."""
+        if not self.events:
+            raise ValueError("no events added")
+        specs = [s for s, _ in self.events]
+        reps = [r for _, r in self.events]
+        f0 = np.asarray(specs[0].f0_range, dtype=float)
+        for s in specs[1:]:
+            if not np.allclose(np.asarray(s.f0_range, dtype=float), f0):
+                raise ValueError("all events must share the same f0_range")
+        for s in specs:
+            if not hasattr(s, 'fds'):
+                raise ValueError("each event must have .fds (run get_fds first)")
+            if not hasattr(s, 'ers'):
+                raise ValueError("each event must have .ers (run get_ers first)")
+        self.f0_range = f0
+        self.fds_ref = combine_fds([s.fds for s in specs], repeats=reps)
+        self.ers_ref = envelope_ers([s.ers for s in specs])
+        return self
