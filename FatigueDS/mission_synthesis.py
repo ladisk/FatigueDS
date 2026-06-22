@@ -118,3 +118,34 @@ class MissionSynthesis:
         self.fds_ref = combine_fds([s.fds for s in specs], repeats=reps)
         self.ers_ref = envelope_ers([s.ers for s in specs])
         return self
+
+    def _resolve_param(self, name, override):
+        if override is not None:
+            return override
+        vals = [getattr(s, name) for s, _ in self.events if hasattr(s, name)]
+        if not vals:
+            raise ValueError(f"parameter '{name}' not found on events; pass it explicitly")
+        first = vals[0]
+        if any(not np.isclose(v, first) for v in vals):
+            raise ValueError(f"events have inconsistent '{name}'; pass it explicitly to invert()")
+        return first
+
+    def invert(self, T_test, k=None, C=None, p=None, Q=None):
+        """Invert the reference FDS to a test acceleration PSD for duration T_test.
+
+        Material params default to the (consistent) values on the events; pass any of
+        k, C, p, Q to override. Sets self.test_psd and self.test_psd_freq.
+        """
+        if not hasattr(self, 'fds_ref'):
+            raise ValueError("call combine() before invert()")
+        if T_test <= 0:
+            raise ValueError("T_test must be positive")
+        self.k = self._resolve_param('k', k)
+        self.C = self._resolve_param('C', C)
+        self.p = self._resolve_param('p', p)
+        self.Q = self._resolve_param('Q', Q)
+        self.T_test = T_test
+        self.test_psd = invert_fds_to_psd(
+            self.fds_ref, self.f0_range, k=self.k, C=self.C, p=self.p, Q=self.Q, T_test=T_test)
+        self.test_psd_freq = self.f0_range
+        return self

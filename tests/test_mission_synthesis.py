@@ -123,3 +123,46 @@ def test_combine_missing_fds_raises():
     ms = MissionSynthesis([s])
     with pytest.raises(ValueError):
         ms.combine()
+
+
+def test_invert_uses_event_params_and_matches_helper():
+    e1 = _make_event(amp=10.0)  # built with k=5, C=1, p=1, Q=10 (default)
+    ms = MissionSynthesis([e1])
+    ms.combine()
+    ms.invert(T_test=1800.0)
+    expected = invert_fds_to_psd(ms.fds_ref, ms.f0_range, k=5, C=1, p=1, Q=10, T_test=1800.0)
+    assert np.allclose(ms.test_psd, expected)
+    assert np.allclose(ms.test_psd_freq, ms.f0_range)
+
+
+def test_invert_before_combine_raises():
+    ms = MissionSynthesis([_make_event()])
+    with pytest.raises(ValueError):
+        ms.invert(T_test=1800.0)
+
+
+def test_invert_bad_T_test_raises():
+    ms = MissionSynthesis([_make_event()])
+    ms.combine()
+    with pytest.raises(ValueError):
+        ms.invert(T_test=0)
+
+
+def test_invert_inconsistent_params_raises():
+    e1 = _make_event(amp=10.0)
+    e2 = _make_event(amp=10.0)
+    e2.k = 7  # force inconsistent S-N slope across events
+    ms = MissionSynthesis([e1, e2])
+    ms.combine()
+    with pytest.raises(ValueError):
+        ms.invert(T_test=1800.0)
+
+
+def test_invert_override_param():
+    e1 = _make_event(amp=10.0)
+    e2 = _make_event(amp=10.0)
+    e2.k = 7
+    ms = MissionSynthesis([e1, e2])
+    ms.combine()
+    ms.invert(T_test=1800.0, k=5)  # override resolves the inconsistency
+    assert ms.k == 5
