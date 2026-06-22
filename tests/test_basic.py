@@ -74,7 +74,7 @@ class TestCore:
         """ Test the random time history function with psd averaging"""
         _time_data = np.load('test_data/test_time_history.npy', allow_pickle=True)
         time_history_data = _time_data[:,1]
-        t = _time_data[:,0] 
+        t = _time_data[:,0]
         dt = t[2] - t[1]
 
         load_spectrum_averaging = FatigueDS.Spectrum(freq_data=(20, 200, 5))
@@ -84,5 +84,31 @@ class TestCore:
 
         assert np.allclose(load_spectrum_averaging.ers, random_time_averaging_ers_true)
         assert np.allclose(load_spectrum_averaging.fds, random_time_averaging_fds_true)
+
+
+def test_narrowband_crossing_rate_equals_f0():
+    """Absolute, literature-anchored check of the FDS/ERS cycle-rate convention.
+
+    For a single-DOF oscillator (Q=10) excited by broadband (white) random vibration,
+    the response is narrow-band and its mean number of upward zero-crossings per
+    second equals the natural frequency f0 (Lalanne, *Specification Development*,
+    Vol.5 p.46: "n0 is equal to f0"; verified numerically in Vol.5 Example 4.4, where
+    a 10 Hz oscillator shows 50 up-crossings in 5 s -> 10 Hz). This is the quantity
+    n0+ used in the random ERS/FDS, so it pins down the (1/(2*pi)) factor in
+    n0+ = (1/(2*pi)) * (dz_rms/z_rms) and guards against the factor-of-2 error of
+    using 1/pi (which would yield ~2*f0).
+    """
+    rng = np.random.default_rng(0)
+    fs = 2048.0
+    dt = 1 / fs
+    acc = rng.standard_normal(int(120.0 * fs))  # broadband (white) excitation
+    damp = 1 / (2 * 10)  # Q = 10
+
+    for f0 in (50.0, 100.0, 150.0, 200.0):
+        z = FatigueDS.tools.response_relative_displacement(acc, dt, f_0=f0, damp=damp)
+        z = z[len(z) // 20:]  # drop start-up transient
+        n_up = np.count_nonzero((z[:-1] < 0) & (z[1:] >= 0))
+        rate = n_up / (len(z) * dt)
+        assert np.isclose(rate, f0, rtol=0.02), f"f0={f0}: crossing rate {rate:.2f} != f0"
 
 

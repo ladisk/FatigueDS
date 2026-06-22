@@ -424,7 +424,7 @@ class Spectrum:
 
         # ERS calculation
         if output == 'ERS':
-            n0 = 1 / np.pi * dz_rms / z_rms
+            n0 = 1 / (2 * np.pi) * dz_rms / z_rms  # n0+ = (1/2pi)*sqrt(M2/M0), Lalanne Vol.3 eq [5.76]; for a Q=10 narrow-band response n0+ = f0 (Vol.5 p.46, Ex 4.4)
             ers = (2 * np.pi * self.f0_range)**2 * z_rms * np.sqrt(2 * np.log(n0 * self.T))
             return ers
         
@@ -432,7 +432,7 @@ class Spectrum:
         elif output == 'FDS':
             z_rms *= self.unit_scale
             dz_rms *= self.unit_scale
-            n0 = 1 / np.pi * dz_rms / z_rms
+            n0 = 1 / (2 * np.pi) * dz_rms / z_rms  # n0+ = (1/2pi)*sqrt(M2/M0), Lalanne Vol.3 eq [5.76]; for a Q=10 narrow-band response n0+ = f0 (Vol.5 p.46, Ex 4.4)
             fds = self.p**self.k / self.C * n0 * self.T * (z_rms * np.sqrt(2))**self.k * gamma(1 + self.k / 2)
             return fds
         
@@ -457,7 +457,7 @@ class Spectrum:
                 
                 rf = rainflow.count_cycles(z)
                 rf = np.asarray(rf)
-                cyc_sum = np.sum(rf[:,1] * 2 * (rf[:,0] / 2)**self.k)  # *2 and /2 because rainflow returns cycles and ranges, fds theory is defined for half cycles and amplitudes
+                cyc_sum = np.sum(rf[:,1] * (rf[:,0] / 2)**self.k)  # rainflow count = full cycles, range/2 = amplitude; full-cycle Miner-Basquin damage (Lalanne Vol.4 eq [4.6], full-cycle form)
                 D_i = self.p**self.k / (self.C) * cyc_sum
                 fds[i] = D_i
             return fds
