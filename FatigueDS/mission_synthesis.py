@@ -1,6 +1,7 @@
 import numpy as np
 from scipy.special import gamma
 import warnings
+import matplotlib.pyplot as plt
 from .spectrum import Spectrum
 
 
@@ -173,3 +174,39 @@ class MissionSynthesis:
                 f"test ERS exceeds reference ERS (max ratio {ratio[i]:.2f} at "
                 f"{self.f0_range[i]:.1f} Hz): possible over-test")
         return self
+
+    def plot_fds(self, new_figure=True, **kwargs):
+        """Plot the reference (combined) fatigue damage spectrum."""
+        if not hasattr(self, 'fds_ref'):
+            raise ValueError("call combine() before plot_fds()")
+        if new_figure:
+            plt.figure()
+        plt.semilogy(self.f0_range, self.fds_ref, **kwargs)
+        plt.xlabel('Frequency [Hz]')
+        plt.ylabel('FDS [Damage]')
+        plt.title('Reference Fatigue Damage Spectrum')
+        plt.grid(visible=True)
+
+    def plot_ers(self, new_figure=True, **kwargs):
+        """Plot the reference (enveloped) extreme response spectrum."""
+        if not hasattr(self, 'ers_ref'):
+            raise ValueError("call combine() before plot_ers()")
+        if new_figure:
+            plt.figure()
+        plt.plot(self.f0_range, self.ers_ref, **kwargs)
+        plt.xlabel('Frequency [Hz]')
+        plt.ylabel('ERS [m/s²]')
+        plt.title('Reference Extreme Response Spectrum')
+        plt.grid(visible=True)
+
+    def plot_test_psd(self, new_figure=True, **kwargs):
+        """Plot the derived equivalent test PSD."""
+        if not hasattr(self, 'test_psd'):
+            raise ValueError("call invert() before plot_test_psd()")
+        if new_figure:
+            plt.figure()
+        plt.semilogy(self.test_psd_freq, self.test_psd, **kwargs)
+        plt.xlabel('Frequency [Hz]')
+        plt.ylabel('PSD [(m/s²)²/Hz]')
+        plt.title('Equivalent Test PSD')
+        plt.grid(visible=True)

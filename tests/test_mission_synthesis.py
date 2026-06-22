@@ -201,3 +201,27 @@ def test_check_ers_before_invert_raises():
     ms.combine()
     with pytest.raises(ValueError):
         ms.check_ers()
+
+
+import matplotlib
+matplotlib.use('Agg')
+
+
+def test_exports_from_package():
+    assert hasattr(FatigueDS, 'MissionSynthesis')
+    assert hasattr(FatigueDS, 'invert_fds_to_psd')
+
+
+def test_plots_run():
+    ms = MissionSynthesis([_make_event()])
+    ms.combine()
+    ms.invert(T_test=1800.0)
+    ms.plot_fds()
+    ms.plot_ers()
+    ms.plot_test_psd()
+
+
+def test_plot_before_combine_raises():
+    ms = MissionSynthesis([_make_event()])
+    with pytest.raises(ValueError):
+        ms.plot_fds()
