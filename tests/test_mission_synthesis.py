@@ -166,3 +166,38 @@ def test_invert_override_param():
     ms.combine()
     ms.invert(T_test=1800.0, k=5)  # override resolves the inconsistency
     assert ms.k == 5
+
+
+def _random_event(T):
+    rng = np.random.default_rng(0)
+    fs = 2048.0
+    acc = rng.standard_normal(int(T * fs))
+    s = FatigueDS.Spectrum(freq_data=(50, 400, 10), Q=10)
+    s.set_random_load((acc, 1 / fs), unit='ms2')
+    s.get_ers()
+    s.get_fds(k=8, C=1, p=1)
+    return s
+
+
+def test_check_ers_sets_ratio():
+    ms = MissionSynthesis([_random_event(T=20.0)])
+    ms.combine()
+    ms.invert(T_test=20.0)  # same duration -> ERS ~ reference
+    ms.check_ers()
+    assert ms.ers_ratio.shape == ms.f0_range.shape
+    assert np.all(np.isfinite(ms.ers_ratio))
+
+
+def test_check_ers_warns_on_overtest():
+    ms = MissionSynthesis([_random_event(T=20.0)])
+    ms.combine()
+    ms.invert(T_test=2.0)  # 10x acceleration -> higher PSD -> higher test ERS
+    with pytest.warns(UserWarning):
+        ms.check_ers()
+
+
+def test_check_ers_before_invert_raises():
+    ms = MissionSynthesis([_random_event(T=20.0)])
+    ms.combine()
+    with pytest.raises(ValueError):
+        ms.check_ers()

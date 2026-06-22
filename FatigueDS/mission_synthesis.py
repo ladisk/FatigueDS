@@ -1,5 +1,7 @@
 import numpy as np
 from scipy.special import gamma
+import warnings
+from .spectrum import Spectrum
 
 
 def combine_fds(fds_list, repeats=None):
@@ -148,4 +150,26 @@ class MissionSynthesis:
         self.test_psd = invert_fds_to_psd(
             self.fds_ref, self.f0_range, k=self.k, C=self.C, p=self.p, Q=self.Q, T_test=T_test)
         self.test_psd_freq = self.f0_range
+        return self
+
+    def check_ers(self, tol=0.05):
+        """Compare the derived test ERS to the reference ERS (over-test guard).
+
+        Sets self.ers_test and self.ers_ratio = ers_test / ers_ref (0 where ers_ref==0).
+        Warns where ers_ratio > 1 + tol (the accelerated test exceeds the field extreme
+        response and may excite field-absent failure modes).
+        """
+        if not hasattr(self, 'test_psd'):
+            raise ValueError("call invert() before check_ers()")
+        s = Spectrum(freq_data=self.f0_range, Q=self.Q)
+        s.set_random_load((self.test_psd, self.test_psd_freq), unit='ms2', T=self.T_test)
+        s.get_ers()
+        self.ers_test = s.ers
+        ratio = np.where(self.ers_ref > 0, self.ers_test / self.ers_ref, 0.0)
+        self.ers_ratio = ratio
+        if np.any(ratio > 1 + tol):
+            i = int(np.argmax(ratio))
+            warnings.warn(
+                f"test ERS exceeds reference ERS (max ratio {ratio[i]:.2f} at "
+                f"{self.f0_range[i]:.1f} Hz): possible over-test")
         return self
