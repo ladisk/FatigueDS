@@ -42,23 +42,23 @@ same natural-frequency range (``freq_data``) and the same material parameters.
 
 .. code-block:: python
 
-    freq_range = (20, 480, 5)        # shared natural-frequency axis [Hz]
+    # grid extends beyond the excitation so the band of interest stays interior
+    freq_range = (20, 600, 5)        # shared natural-frequency axis [Hz]
     Q = 10                           # quality factor
     k, C, p = 7, 1.0, 1.0            # S-N slope, S-N constant, stress/displacement constant
+    freq = np.arange(20, 600, 1.0)   # PSD frequency axis (use smooth, measured-like PSDs)
 
-    # Event 1: road transport - broadband 20-500 Hz, 3 hours
-    freq1 = np.arange(20, 500, 1.0)
-    psd1 = np.full_like(freq1, 0.5)  # (m/s^2)^2/Hz
+    # Event 1: road transport - broad low-frequency content, 3 hours
+    psd1 = 0.6 * np.exp(-0.5 * ((freq - 110) / 85) ** 2)   # (m/s^2)^2/Hz
     road = FatigueDS.Spectrum(freq_data=freq_range, Q=Q)
-    road.set_random_load((psd1, freq1), unit='ms2', T=3 * 3600)
+    road.set_random_load((psd1, freq), unit='ms2', T=3 * 3600)
     road.get_ers()
     road.get_fds(k=k, C=C, p=p)
 
     # Event 2: engine running - a resonance bump around 275 Hz, 1 hour, occurs 5 times
-    freq2 = np.arange(20, 500, 1.0)
-    psd2 = 2.0 * np.exp(-0.5 * ((freq2 - 275) / 70) ** 2)   # smooth resonance bump
+    psd2 = 2.0 * np.exp(-0.5 * ((freq - 275) / 70) ** 2)   # smooth resonance bump
     engine = FatigueDS.Spectrum(freq_data=freq_range, Q=Q)
-    engine.set_random_load((psd2, freq2), unit='ms2', T=1 * 3600)
+    engine.set_random_load((psd2, freq), unit='ms2', T=1 * 3600)
     engine.get_ers()
     engine.get_fds(k=k, C=C, p=p)
 
@@ -135,9 +135,15 @@ roughly 1.4x and ``check_ers()`` emits a warning. Lengthening ``T_test`` (a mild
 acceleration) reduces the over-test.
 
 .. note::
-   Use smooth field PSDs (as measured). A PSD with a hard band edge makes the
-   reference FDS jump almost discontinuously there; because each oscillator responds
-   over a finite bandwidth (~f0/Q), the inversion cannot reproduce such a step and
-   produces a non-physical notch in the test PSD just below the edge. In practice the
-   raw inverted PSD is then **enveloped** into a few breakpoints to form the final
-   specification.
+   Two practical points to avoid artifacts in the inverted PSD:
+
+   * **Use smooth field PSDs** (as measured). A hard PSD band edge makes the reference
+     FDS jump almost discontinuously; because each oscillator responds over a finite
+     bandwidth (~f0/Q), the inversion cannot reproduce such a step and carves a
+     non-physical notch in the test PSD just below the edge.
+   * **Extend ``freq_range`` beyond the highest excitation frequency**, so the band of
+     interest stays interior and the unavoidable grid-edge distortion falls in the
+     negligible (near-zero) tail.
+
+   In practice the raw inverted PSD is also **enveloped** into a few breakpoints to
+   form the final specification.
