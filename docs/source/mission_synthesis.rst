@@ -54,9 +54,9 @@ same natural-frequency range (``freq_data``) and the same material parameters.
     road.get_ers()
     road.get_fds(k=k, C=C, p=p)
 
-    # Event 2: engine running - 150-400 Hz at a higher level, 1 hour, occurs 5 times
-    freq2 = np.arange(150, 400, 1.0)
-    psd2 = np.full_like(freq2, 2.0)
+    # Event 2: engine running - a resonance bump around 275 Hz, 1 hour, occurs 5 times
+    freq2 = np.arange(20, 500, 1.0)
+    psd2 = 2.0 * np.exp(-0.5 * ((freq2 - 275) / 70) ** 2)   # smooth resonance bump
     engine = FatigueDS.Spectrum(freq_data=freq_range, Q=Q)
     engine.set_random_load((psd2, freq2), unit='ms2', T=1 * 3600)
     engine.get_ers()
@@ -131,5 +131,13 @@ present in service).
 
 For the aggressive ~16x time compression above (about 8 hours of life into a 30
 minute test, with an S-N slope ``k = 7``), the test ERS exceeds the reference by
-roughly 1.6x and ``check_ers()`` emits a warning. Lengthening ``T_test`` (a milder
+roughly 1.4x and ``check_ers()`` emits a warning. Lengthening ``T_test`` (a milder
 acceleration) reduces the over-test.
+
+.. note::
+   Use smooth field PSDs (as measured). A PSD with a hard band edge makes the
+   reference FDS jump almost discontinuously there; because each oscillator responds
+   over a finite bandwidth (~f0/Q), the inversion cannot reproduce such a step and
+   produces a non-physical notch in the test PSD just below the edge. In practice the
+   raw inverted PSD is then **enveloped** into a few breakpoints to form the final
+   specification.
