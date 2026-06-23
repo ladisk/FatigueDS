@@ -9,5 +9,6 @@ from .mission_synthesis import (
     combine_fds,
     envelope_ers,
     invert_fds_to_psd,
+    invert_fds_to_psd_iterative,
 )
 from . import tools

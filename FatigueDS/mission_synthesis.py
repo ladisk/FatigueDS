@@ -77,6 +77,64 @@ def invert_fds_to_psd(fds_ref, f0_range, k, C, p, Q, T_test):
     return psd
 
 
+def invert_fds_to_psd_iterative(fds_ref, f0_range, k, C, p, Q, T_test,
+                                max_iter=200, patience=15):
+    """Invert a reference FDS to a test PSD by Lalanne's iteration method.
+
+    Lalanne (Specification Development, Vol.5) eq [11.11]: starting from an initial
+    PSD, repeatedly rescale each level by the ratio of the target to the achieved FDS,
+
+        G_{n+1}(f_i) = G_n(f_i) * ( FDS_ref(f_i) / FDS(G_n)(f_i) )**(2/k),
+
+    where FDS(G_n) is the *full* forward FDS of the candidate PSD (computed with
+    ``Spectrum``, so it includes the off-resonance response of each oscillator). This
+    reproduces the reference FDS far better than the diagonal closed form
+    ``invert_fds_to_psd`` (used here as the initial guess), which ignores off-resonance
+    coupling. Lalanne recommends this iteration over the matrix-inversion method
+    (eq [11.2]), which is prone to numerical instability.
+
+    The best-fitting PSD found is returned. Note that a reference FDS obtained by
+    *summing* events (mission synthesis) is generally not exactly the FDS of any single
+    stationary PSD (FDS is non-linear in the PSD for k != 2), so a small residual at
+    sharp FDS features is expected and irreducible; the iteration is stopped once it
+    stops improving.
+
+    :param fds_ref: reference fatigue damage spectrum (per f0)
+    :param f0_range: natural-frequency axis [Hz] (uniformly spaced)
+    :param k, C, p, Q: material/structure parameters (see ``invert_fds_to_psd``)
+    :param T_test: test duration [s]
+    :param max_iter: maximum number of iterations
+    :param patience: stop after this many iterations without improvement
+    :return: (psd, n_iter, error) - best PSD on f0_range, iterations used, and the
+        achieved error = max|FDS(psd)/FDS_ref - 1| over the non-zero reference
+    """
+    fds_ref = np.asarray(fds_ref, dtype=float)
+    f0 = np.asarray(f0_range, dtype=float)
+    if T_test <= 0:
+        raise ValueError("T_test must be positive")
+    m = fds_ref > 0
+    G = invert_fds_to_psd(fds_ref, f0, k=k, C=C, p=p, Q=Q, T_test=T_test)  # warm start
+    best_G, best_err, stale, n_iter = G.copy(), np.inf, 0, 0
+    for it in range(1, max_iter + 1):
+        s = Spectrum(freq_data=f0, Q=Q)
+        s.set_random_load((G, f0), unit='ms2', T=T_test)
+        s.get_fds(k=k, C=C, p=p)
+        cand = s.fds
+        n_iter = it
+        err = np.max(np.abs(cand[m] / fds_ref[m] - 1.0)) if np.any(m) else 0.0
+        if err < best_err * (1 - 1e-3):
+            best_err, best_G, stale = err, G.copy(), 0
+        else:
+            stale += 1
+            if stale >= patience:
+                break
+        ratio = np.ones_like(G)
+        good = m & (cand > 0)
+        ratio[good] = fds_ref[good] / cand[good]
+        G = G * ratio ** (2.0 / k)
+    return best_G, n_iter, best_err
+
+
 class MissionSynthesis:
     """Combine the FDS/ERS of several Spectrum events into reference curves and
     invert the reference FDS into an equivalent accelerated test PSD.
@@ -133,11 +191,23 @@ class MissionSynthesis:
             raise ValueError(f"events have inconsistent '{name}'; pass it explicitly to invert()")
         return first
 
-    def invert(self, T_test, k=None, C=None, p=None, Q=None):
+    def invert(self, T_test, k=None, C=None, p=None, Q=None,
+               method='iteration', max_iter=200, warn_tol=0.25):
         """Invert the reference FDS to a test acceleration PSD for duration T_test.
 
         Material params default to the (consistent) values on the events; pass any of
         k, C, p, Q to override. Sets self.test_psd and self.test_psd_freq.
+
+        :param method: 'iteration' (default) - Lalanne's iterative method (eq [11.11]),
+            whose result reproduces the reference FDS through the full forward response
+            (off-resonance included); 'closed_form' - the fast diagonal/narrow-band
+            approximation (inverse of eq [4.9]), which ignores off-resonance coupling.
+        :param max_iter: maximum iterations for the 'iteration' method
+        :param warn_tol: warn if the iteration's achieved FDS error exceeds this (the
+            reference may not be well representable by a single stationary PSD)
+
+        For 'iteration', also sets self.invert_n_iter and self.invert_error (the
+        achieved max|FDS(test_psd)/FDS_ref - 1|).
         """
         if not hasattr(self, 'fds_ref'):
             raise ValueError("call combine() before invert()")
@@ -148,8 +218,21 @@ class MissionSynthesis:
         self.p = self._resolve_param('p', p)
         self.Q = self._resolve_param('Q', Q)
         self.T_test = T_test
-        self.test_psd = invert_fds_to_psd(
-            self.fds_ref, self.f0_range, k=self.k, C=self.C, p=self.p, Q=self.Q, T_test=T_test)
+        self.method = method
+        if method == 'iteration':
+            self.test_psd, self.invert_n_iter, self.invert_error = invert_fds_to_psd_iterative(
+                self.fds_ref, self.f0_range, k=self.k, C=self.C, p=self.p, Q=self.Q,
+                T_test=T_test, max_iter=max_iter)
+            if self.invert_error > warn_tol:
+                warnings.warn(
+                    f"reference FDS reproduced only to {self.invert_error:.0%} at best; "
+                    f"it may not be representable by a single stationary PSD "
+                    f"(e.g. a sharply peaked or sine-derived reference FDS)")
+        elif method == 'closed_form':
+            self.test_psd = invert_fds_to_psd(
+                self.fds_ref, self.f0_range, k=self.k, C=self.C, p=self.p, Q=self.Q, T_test=T_test)
+        else:
+            raise ValueError("method must be 'iteration' or 'closed_form'")
         self.test_psd_freq = self.f0_range
         return self
 

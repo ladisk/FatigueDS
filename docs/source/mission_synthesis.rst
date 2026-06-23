@@ -16,6 +16,14 @@ Development* (ISTE / Wiley, 2009):
 * the resulting test ERS is **compared** to the reference ERS to guard against
   over-testing.
 
+.. note::
+   The "road transport + engine" life profile below is an *illustrative* scenario
+   (the numbers are chosen to demonstrate the workflow). It is in the spirit of
+   Lalanne's own life-profile examples, which combine named real-world environments —
+   e.g. truck transport + missile flight (Example 11.2), aircraft + helicopter
+   (Example 11.3), and a full truck (good road / bad road / railroad-crossing) +
+   aircraft + helicopter profile (Example 11.4).
+
 Import the required packages
 ----------------------------
 
@@ -86,13 +94,27 @@ fatigue damage over the chosen test duration ``T_test``. A shorter test duration
 gives a higher level (an accelerated test). The material parameters default to the
 values stored on the events; pass ``k``, ``C``, ``p`` or ``Q`` to override.
 
+By default it uses Lalanne's **iteration method** (Vol. 5 eq [11.11]): it repeatedly
+adjusts the PSD until the *full forward* FDS of the candidate PSD matches the
+reference (so it accounts for each oscillator's off-resonance response). The achieved
+fit is reported in ``ms.invert_error`` (max relative FDS error) and ``ms.invert_n_iter``.
+A fast diagonal approximation is available with ``method='closed_form'`` (the inverse
+of eq [4.9]); it ignores off-resonance coupling and is mainly useful as a quick
+estimate.
+
 .. code-block:: python
 
     T_test = 30 * 60                 # 30-minute accelerated test [s]
-    ms.invert(T_test=T_test)
+    ms.invert(T_test=T_test)         # method='iteration' by default
 
     # derived test PSD is available as ms.test_psd on ms.test_psd_freq
+    print('FDS reproduced to', f'{ms.invert_error:.1%}', 'in', ms.invert_n_iter, 'iterations')
     ms.plot_test_psd()
+
+.. note::
+   A reference FDS obtained by *summing* several events is generally not exactly the
+   FDS of any single stationary PSD (the FDS is non-linear in the PSD for ``k != 2``),
+   so a small residual at sharp FDS features is expected and irreducible.
 
 Over-test guard
 ---------------

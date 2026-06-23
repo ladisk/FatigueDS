@@ -129,7 +129,7 @@ def test_invert_uses_event_params_and_matches_helper():
     e1 = _make_event(amp=10.0)  # built with k=5, C=1, p=1, Q=10 (default)
     ms = MissionSynthesis([e1])
     ms.combine()
-    ms.invert(T_test=1800.0)
+    ms.invert(T_test=1800.0, method='closed_form')
     expected = invert_fds_to_psd(ms.fds_ref, ms.f0_range, k=5, C=1, p=1, Q=10, T_test=1800.0)
     assert np.allclose(ms.test_psd, expected)
     assert np.allclose(ms.test_psd_freq, ms.f0_range)
@@ -164,7 +164,7 @@ def test_invert_override_param():
     e2.k = 7
     ms = MissionSynthesis([e1, e2])
     ms.combine()
-    ms.invert(T_test=1800.0, k=5)  # override resolves the inconsistency
+    ms.invert(T_test=1800.0, k=5, method='closed_form')  # override resolves the inconsistency
     assert ms.k == 5
 
 
@@ -182,7 +182,7 @@ def _random_event(T):
 def test_check_ers_sets_ratio():
     ms = MissionSynthesis([_random_event(T=20.0)])
     ms.combine()
-    ms.invert(T_test=20.0)  # same duration -> ERS ~ reference
+    ms.invert(T_test=20.0, method='closed_form')  # ERS-guard test
     ms.check_ers()
     assert ms.ers_ratio.shape == ms.f0_range.shape
     assert np.all(np.isfinite(ms.ers_ratio))
@@ -191,7 +191,7 @@ def test_check_ers_sets_ratio():
 def test_check_ers_warns_on_overtest():
     ms = MissionSynthesis([_random_event(T=20.0)])
     ms.combine()
-    ms.invert(T_test=2.0)  # 10x acceleration -> higher PSD -> higher test ERS
+    ms.invert(T_test=2.0, method='closed_form')  # 10x acceleration -> higher test ERS
     with pytest.warns(UserWarning):
         ms.check_ers()
 
@@ -210,12 +210,72 @@ matplotlib.use('Agg')
 def test_exports_from_package():
     assert hasattr(FatigueDS, 'MissionSynthesis')
     assert hasattr(FatigueDS, 'invert_fds_to_psd')
+    assert hasattr(FatigueDS, 'invert_fds_to_psd_iterative')
+
+
+def _psd_event(freq_range=(20, 600, 5), k=8):
+    """A Spectrum event whose FDS comes from a known stepped PSD (so we can
+    check that an inversion reproduces that FDS)."""
+    s = FatigueDS.Spectrum(freq_data=freq_range, Q=10)
+    pf = np.arange(20.0, 600.0, 5.0)
+    psd = np.where(pf < 150, 0.5, np.where(pf < 350, 3.0, 0.8))
+    s.set_random_load((psd, pf), unit='ms2', T=3600.0)
+    s.get_ers()
+    s.get_fds(k=k, C=1, p=1)
+    return s
+
+
+def _fds_closure_error(ms):
+    """max relative error between the FDS of the derived test PSD and fds_ref."""
+    s = FatigueDS.Spectrum(freq_data=ms.f0_range, Q=ms.Q)
+    s.set_random_load((ms.test_psd, ms.test_psd_freq), unit='ms2', T=ms.T_test)
+    s.get_fds(k=ms.k, C=ms.C, p=ms.p)
+    m = ms.fds_ref > 0
+    return np.max(np.abs(s.fds[m] / ms.fds_ref[m] - 1.0))
+
+
+def test_invert_iteration_closes_fds():
+    """The iterated test PSD reproduces the reference FDS through the full forward
+    response (Lalanne eq [11.11]); closure error should be small."""
+    ms = MissionSynthesis([_psd_event()])
+    ms.combine()
+    ms.invert(3600.0, method='iteration', max_iter=300)
+    # single-event reference IS the FDS of a PSD, so it is reproducible to high accuracy
+    assert _fds_closure_error(ms) < 0.03            # within 3%
+    assert ms.invert_n_iter >= 1
+    assert ms.invert_error <= 0.03
+
+
+def test_invert_iteration_beats_closed_form():
+    """For a stepped multi-band PSD, the diagonal closed form has large closure
+    error (off-resonance coupling ignored); the iteration is far better."""
+    ms_i = MissionSynthesis([_psd_event()]); ms_i.combine(); ms_i.invert(3600.0, method='iteration', max_iter=300)
+    ms_c = MissionSynthesis([_psd_event()]); ms_c.combine(); ms_c.invert(3600.0, method='closed_form')
+    err_iter = _fds_closure_error(ms_i)
+    err_closed = _fds_closure_error(ms_c)
+    assert err_closed > 0.2                          # diagonal is poor here (>20%)
+    assert err_iter < err_closed / 5                 # iteration is much better
+
+
+def test_invert_closed_form_matches_helper():
+    ms = MissionSynthesis([_psd_event()])
+    ms.combine()
+    ms.invert(3600.0, method='closed_form')
+    expected = invert_fds_to_psd(ms.fds_ref, ms.f0_range, k=ms.k, C=ms.C, p=ms.p, Q=ms.Q, T_test=3600.0)
+    assert np.allclose(ms.test_psd, expected)
+
+
+def test_invert_bad_method_raises():
+    ms = MissionSynthesis([_psd_event()])
+    ms.combine()
+    with pytest.raises(ValueError):
+        ms.invert(3600.0, method='nonsense')
 
 
 def test_plots_run():
     ms = MissionSynthesis([_make_event()])
     ms.combine()
-    ms.invert(T_test=1800.0)
+    ms.invert(T_test=1800.0, method='closed_form')
     ms.plot_fds()
     ms.plot_ers()
     ms.plot_test_psd()
