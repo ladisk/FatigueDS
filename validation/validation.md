@@ -1,8 +1,12 @@
-# Validation of the random-vibration FDS fix (v0.2.0 → v0.3.0)
+# Validation of the random-vibration FDS fix
 
 This documents the correction of a factor-of-2 error in the random Fatigue Damage
 Spectrum and its validation against Christian Lalanne, *Mechanical Vibration and
 Shock Analysis*, 2nd ed., Wiley-ISTE (2009).
+
+**Affected releases:** the error is present in the published releases **0.2.0 and
+0.3.0** (the 0.3.0 release did not include this fix). The correction is intended for
+the next release (0.3.1 / 0.4.0).
 
 ## The correction
 
@@ -64,6 +68,43 @@ White noise 10–1000 Hz vs 475–525 Hz (both PSD = 1), f0 = 500, Q = 10, b = 8
 Package: damage ratio **15.34** (book: 16 = 2^(b/2)); narrow-band contribution
 **6.52%** (book: ~6.25%). The small gap is the genuine finite-band correction (the
 package computes the exact integral; 16 is the idealized asymptote).
+
+### 4. Independent verification (convention-free ground truth + adversarial review)
+
+The fix was cross-checked by four mutually independent methods, none sharing the
+others' reasoning, plus the book. All converge on the corrected formulas.
+
+**Direct rainflow ground truth.** A Gaussian white-noise signal is passed through an
+SDOF oscillator (computed independently of the package), and fatigue damage is taken
+directly as `Σ count·(amplitude)^k` over rainflow-counted full cycles — the
+definition of Miner–Basquin damage, with no spectral formula involved. Two separate
+implementations (one using `scipy.signal.lsim`, one using an impulse-invariant IIR
+filter, 5 seeds, T = 2000 s) give, to machine precision:
+
+| quantity | corrected (`Σ count·(range/2)^k`) | pre-fix (`Σ count·2·(range/2)^k`) |
+|----------|-----------------------------------|-----------------------------------|
+| rainflow damage ÷ direct ground truth | **1.0000** | **2.0000** |
+
+**Cycle rate, measured.** The mean upward zero-crossing rate of the SDOF response
+was measured directly: **1.000·f0** (e.g. 100.0 / 200.0 / 400.0 Hz for f0 = 100 /
+200 / 400). `n0 = (1/2π)·(ż_rms/z_rms)` reproduces it (≈ 0.998·f0); the pre-fix
+`n0 = (1/π)·(ż_rms/z_rms)` gives ≈ 1.996·f0 — twice the true cycle rate.
+
+**Closed-form FDS.** Against the same ground truth, the corrected closed form lands
+at 1.03–1.07× (the residual is the known narrow-band Rayleigh approximation, larger
+at high `k`); the pre-fix form lands at ~2.1×.
+
+**Adversarial review.** An independent reviewer was instructed to build the strongest
+possible case that the *pre-fix* formulas were correct. The defense (Lalanne's
+half-cycle accounting, Coffin–Manson 2N reversals, the explicit `×2` in eq [4.6])
+was found citable but internally inconsistent, and collapsed against the
+convention-free measurements above.
+
+**Root cause.** Both factors of 2 are genuine Lalanne *half-cycle* artifacts — the
+`×2` in eq [4.6] and the `1/π` (= 2·f0 reversals) rate — that were applied to
+**full-cycle** rainflow counts and to the **upward-crossing** rate, without the
+compensating `1/2`. A half-cycle-vs-full-cycle bookkeeping slip; the factor is real
+in the book, but double-counts once paired with full-cycle quantities.
 
 ## Regression tests
 
