@@ -1,3 +1,19 @@
+"""Helper functions for the FatigueDS :class:`~FatigueDS.spectrum.Spectrum` class:
+frequency-range handling, the SDOF response RMS over a segmented PSD, the closed-form
+spectral integrals, the time-domain SDOF response, and material-parameter conversion.
+
+References
+----------
+.. [Lalanne3] C. Lalanne, *Mechanical Vibration and Shock Analysis, Vol. 3:
+   Random Vibration*, 2nd ed., ISTE/Wiley, 2009.
+.. [Lalanne4] C. Lalanne, *Mechanical Vibration and Shock Analysis, Vol. 4:
+   Fatigue Damage*, 2nd ed., ISTE/Wiley, 2009.
+.. [Lalanne5] C. Lalanne, *Mechanical Vibration and Shock Analysis, Vol. 5:
+   Specification Development*, 2nd ed., ISTE/Wiley, 2009.
+.. [Thomson] W. T. Thomson, *Theory of Vibration with Applications*, 2nd ed.,
+   Prentice-Hall, 1981.
+"""
+
 import numpy as np
 from scipy import signal
 from FLife.tools import basquin_to_sn
@@ -40,8 +56,14 @@ def get_freq_range(self, freq_data):
 
 def rms_sum(f_0, psd_freq, psd_data, damp, motion='rel_disp'):
     """
-    This function calculates the response RMS (either relative displacement, velocity or acceleration) for a given 
-    natural frequency and damping ratio. 
+    This function calculates the response RMS (either relative displacement, velocity or acceleration) for a given
+    natural frequency and damping ratio.
+
+    The excitation PSD is treated as ``n`` horizontal straight-line segments and the
+    response mean square is accumulated segment by segment using the closed-form
+    integrals I0/I2/I4 (:func:`integrals_b`). This is the summation kernel of
+    [Lalanne3]_ p.395, eq. [8.86]; the ``pi/(4*xi)`` and ``f0``-power prefactors are
+    applied by the caller in ``spectrum.py``.
 
     :param f_0: system natural frequency [Hz]
     :param psd_freq: PSD frequency range [Hz]
@@ -67,11 +89,8 @@ def rms_sum(f_0, psd_freq, psd_data, damp, motion='rel_disp'):
         h1 = f1[j] / f_0
         h2 = f2[j] / f_0
 
-        # Case where the excitation is defined by PSD comprising "n" straight line segments (Vol.3, equation [8.86])
-        
-        
-        
-
+        # Per-segment contribution G_j * [I_b(h2) - I_b(h1)], the summation kernel of
+        # [Lalanne3] p.395 eq [8.86] (rel_disp uses I0, rel_vel uses I2, rel_acc uses I4).
         if motion == 'rel_disp':
             z_rms = psd_data[j] * (integrals_b(h=h2, b=0, damp=damp) - integrals_b(h=h1, b=0, damp=damp))
             rms_sum += z_rms
@@ -90,42 +109,43 @@ def rms_sum(f_0, psd_freq, psd_data, damp, motion='rel_disp'):
 
 def integrals_b(h, b, damp):
     """
-    This function calculates integrals I_b described in [3] and [4]. See equations (A1-74), (A1-75), (A1-76) in [3]
-    or [A6.20], [A6.22], [A6.24] in [4] or [8.52], [8.53], [8.54] [4].
+    Closed-form evaluation of the dimensionless spectral integrals I0, I2 and I4 used in
+    the segmented-PSD response RMS (:func:`rms_sum`, [Lalanne3]_ eq. [8.86]).
 
-    Literature:
-        [3] Mechanical Environment Test Specification Development Method - Christian LALANNE
-        [4] Christian Lalanne(auth.) Random Vibration Mechanical Vibration and Shock Analysis, Volume 3, Second Edition
-    
+    The closed forms are [Lalanne3]_ Appendix A6, p.544: I0 = eq. [A6.20], I2 = eq.
+    [A6.22], I4 = eq. [A6.24]. They are identical to eqs. (A1-74), (A1-75), (A1-76) in
+    [Lalanne5]_. ``alpha = 2*sqrt(1-xi**2)`` and ``beta = 2*(1-2*xi**2)`` ([Lalanne3]_
+    eq. [8.37]).
+
     :param h: frequency ratio (frequency vs natural frequency) [/]
-    :param b: exponent b [/]
+    :param b: exponent b [/] (0, 2 or 4)
     :param damp: damping ratio [/]
 
     :return: I_b integral value
     """
-    
-    # constants
-    alpha = 2 * np.sqrt(1 - damp**2)    
+
+    # constants ([Lalanne3] eq [8.37])
+    alpha = 2 * np.sqrt(1 - damp**2)
     beta = 2 * (1 - 2 * damp**2)
-    
+
     C0 = damp / (np.pi * alpha)
     C1 = (h**2 + alpha * h + 1)/(h**2 - alpha * h + 1)
     C2 = (2 * h + alpha) / (2 * damp)
     C3 = (2 * h - alpha) / (2 * damp)
     C4 = 4 * damp / np.pi
     C5 = np.arctan(C2) + np.arctan(C3)
-    
+
     # integrals
     if b == 0:
-        Ib = C0 * np.log(C1) + 1 / np.pi * C5  # 84/198 eq. (A1-74) and 560/610 eq. [A6.20]
-    
+        Ib = C0 * np.log(C1) + 1 / np.pi * C5  # I0: [Lalanne3] p.544 eq [A6.20] (= [Lalanne5] eq (A1-74))
+
     elif b == 2:
-        Ib = C0*np.log(1 / C1) + 1 / np.pi * C5  # 84/198 eq. (A1-75) and 560/610 eq. [A6.22] 
-    
+        Ib = C0*np.log(1 / C1) + 1 / np.pi * C5  # I2: [Lalanne3] p.544 eq [A6.22] (= [Lalanne5] eq (A1-75)); log argument reciprocated vs I0
+
     elif b == 4:
-        I0 = C0 * np.log(C1) + 1 / np.pi * C5 
+        I0 = C0 * np.log(C1) + 1 / np.pi * C5
         I2 = -C0 * np.log(C1) + 1 / np.pi * C5
-        Ib = C4 * h + beta * I2 - I0  # 84/198 eq. (A1-76) and 560/610 eq. [A6.24]
+        Ib = C4 * h + beta * I2 - I0  # I4: [Lalanne3] p.544 eq [A6.24] (= [Lalanne5] eq (A1-76))
 
     else:
         raise ValueError(f"Invalid exponent ``b``='{b}'. Supported exponents: 0, 2 and 4.")
@@ -135,12 +155,18 @@ def integrals_b(h, b, damp):
 
 def response_relative_displacement(time_data, dt, f_0, damp):
     """
-    Returns relative response displacement of a linear SDOF system by performing the convolution of a signal and impulse response 
-    function, defined in [1]. The function is used in calculation of the extreme response spectrum (ERS) of a random time signal.
+    Returns the relative response displacement of a linear SDOF system by convolving the
+    base-excitation signal with the system's unit-impulse response (Duhamel's integral).
+    Used to obtain the SDOF response for the time-domain ERS/FDS of a random signal.
 
-    Literature: 
-        [1] WILLIAM T. THOMSON, Theory of vibration with applications -> see page 111/512 equation (4.2-5)
-    
+    The impulse response used here is that of the *damped* SDOF system,
+    ``h(t) = -1/omega_d * exp(-xi*omega_0*t) * sin(omega_d*t)`` with
+    ``omega_d = omega_0*sqrt(1-xi**2)`` -- the damped generalisation of the impulse
+    response / convolution (Duhamel) integral in [Thomson]_ ch. 4 (impulse response and
+    convolution, eq. (4.2-5) gives the undamped case). The leading sign and the
+    ``1/omega_d`` factor give the relative displacement of the mass w.r.t. its base for a
+    unit base acceleration.
+
     :param time_data: signal time data [m/s^2]
     :param dt: time step [s]
     :param f_0: system natural frequency [Hz]
@@ -184,6 +210,7 @@ def material_parameters_convert(sigma_f, b, range = False):
     """
     Converts Basquin equation parameters ``sigma_f`` and ``b`` to fatigue life parameters ``C`` and ``k``,
     using a function from FLife package. Basic form of Basquin equation is used here: ``sigma_a = sigma_f* (2*N)**b``. The function converts to parameters from equation ``N * s**k = C``
+    (the S-N / Basquin law, [Lalanne4]_ p.22, eqs. [1.13]-[1.15]).
 
     :param sigma_f:
         Fatigue strength coefficient [MPa**k].
