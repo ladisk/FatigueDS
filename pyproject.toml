@@ -6,9 +6,10 @@ build-backend = "hatchling.build"
 
 [project]
 name = "FatigueDS"
-version = "0.3.0"
+version = "0.3.1"
 maintainers = [
-    { name = "Jaša Šonc, Janko Slavič", email = "jasasonc@gmail.com" },
+    { name = "Jaša Šonc", email = "jasa.sonc@fs.uni-lj.si" },
+    { name = "Janko Slavič", email = "janko.slavic@fs.uni-lj.si" },
 ]
 license = "MIT"
 description = "Fatigue Damage Spectrum (FDS) and Extreme Response Spectrum (ERS)"
@@ -37,7 +38,18 @@ classifiers = [
 ]
 
 [[project.authors]]
-name = "Jaša Šonc, Martin Česnik, Rok Pavlin, Janko Slavič"
+name = "Jaša Šonc"
+email = "jasa.sonc@fs.uni-lj.si"
+
+[[project.authors]]
+name = "Martin Česnik"
+email = "jankmartin.cesnik@fs.uni-lj.si"
+
+[[project.authors]]
+name = "Rok Pavlin"
+
+[[project.authors]]
+name = "Janko Slavič"
 email = "janko.slavic@fs.uni-lj.si"
 
 [project.optional-dependencies]
