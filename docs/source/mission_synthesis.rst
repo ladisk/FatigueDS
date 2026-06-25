@@ -147,3 +147,28 @@ acceleration) reduces the over-test.
 
    In practice the raw inverted PSD is also **enveloped** into a few breakpoints to
    form the final specification.
+
+Hand off to FLife
+-----------------
+
+FatigueDS and `FLife <https://github.com/ladisk/FLife>`_ share the same S-N material
+convention (``k``, ``C``), so the derived test specification can be passed straight to
+FLife to estimate the fatigue life (or to verify the achieved damage) of the test PSD.
+``ms.to_flife_input()`` returns the test PSD in the dictionary form that
+``FLife.SpectralData`` accepts:
+
+.. code-block:: python
+
+    import FLife
+
+    sd = FLife.SpectralData(input=ms.to_flife_input())
+    life = FLife.Narrowband(sd).get_life(C=ms.C, k=ms.k)
+    print('estimated test life:', life, 's')
+
+The relationship is exact: the FatigueDS random-vibration FDS at each natural frequency is
+the FLife narrow-band damage of that oscillator's stress response, so the two packages agree
+on the narrow-band fatigue damage of a given PSD. Conversely, a FLife ``SpectralData`` can be
+fed directly into :meth:`~FatigueDS.Spectrum.set_random_load` (its PSD is used as a random
+PSD input), and Basquin parameters can be converted to and from the ``k``/``C`` form with
+:func:`~FatigueDS.tools.material_parameters_convert` and
+:func:`~FatigueDS.tools.material_parameters_convert_to_basquin`.

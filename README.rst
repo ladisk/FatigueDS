@@ -227,6 +227,49 @@ test exceeds the reference ERS and ``check_ers()`` emits an over-test warning; l
 `mission synthesis documentation <https://fatigueds.readthedocs.io/en/latest/mission_synthesis.html>`_
 for the full example and practical guidance.
 
+Interoperability with FLife
+---------------------------
+
+FatigueDS shares its S-N material convention (``k``, ``C``) with the
+`FLife <https://github.com/ladisk/FLife>`_ vibration-fatigue package, so the two work together
+without any parameter translation:
+
+- a ``FLife.SpectralData`` instance can be passed straight into ``set_random_load`` (its PSD is
+  used as a random PSD input);
+- the equivalent test PSD from mission synthesis can be handed back to FLife to estimate the
+  test life, via ``MissionSynthesis.to_flife_input()``;
+- Basquin parameters convert to and from the ``k``/``C`` form with
+  ``FatigueDS.tools.material_parameters_convert`` and ``material_parameters_convert_to_basquin``.
+
+.. code-block:: python
+
+    import numpy as np
+    import FLife
+    import FatigueDS
+
+    # a PSD and its frequency vector (e.g. measured), as for the random-PSD example above
+    freq = np.arange(0, 2000, 1.0)
+    psd = np.where((freq >= 50) & (freq <= 800), 2.0, 0.0)  # (m/s^2)^2/Hz
+
+    # 1. use a FLife SpectralData (PSD) directly as a FatigueDS random load
+    sd = FLife.SpectralData(input={'PSD': psd, 'f': freq})
+    load_spectrum = FatigueDS.Spectrum(freq_data=(20, 1000, 20), Q=10)
+    load_spectrum.set_random_load(sd, unit='ms2', T=3600)
+    load_spectrum.get_fds(k=7, C=1.0, p=1.0)
+
+    # 2. hand a tailored mission-synthesis test PSD back to FLife for life estimation
+    #    (ms is the MissionSynthesis object from the example above, after invert())
+    sd_test = FLife.SpectralData(input=ms.to_flife_input())
+    life = FLife.Narrowband(sd_test).get_life(C=ms.C, k=ms.k)
+
+    # 3. convert Basquin parameters (sigma_f, b) <-> fatigue-life parameters (C, k)
+    C, k = FatigueDS.tools.material_parameters_convert(sigma_f=800.0, b=-0.1)
+    sigma_f, b = FatigueDS.tools.material_parameters_convert_to_basquin(C, k)
+
+The relationship is exact: the FatigueDS random-vibration FDS at each natural frequency equals
+the FLife narrow-band damage of that oscillator's stress response, so both packages agree on
+the narrow-band fatigue damage of a given PSD.
+
 
 References:
     1. C. Lalanne, Mechanical Vibration and Shock Analysis (2nd edition),
