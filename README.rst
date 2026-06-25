@@ -158,7 +158,81 @@ Here is an example of determining the ERS and FDS of a sine and sine-sweep signa
     load_spectrum_sine_sweep.plot_ers(label='sine sweep')
     load_spectrum_sine_sweep.plot_fds(label='sine sweep')
 
+Mission synthesis (test tailoring)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Mission synthesis combines the fatigue damage of several real-life vibration events into a
+reference FDS and ERS, and then *inverts* the reference FDS into an equivalent, accelerated
+laboratory test PSD. The FDS of the events are summed (fatigue damage accumulates), the ERS
+are enveloped (the extreme stress is the worst single event), and a final over-test guard
+compares the derived test ERS against the reference.
+
+Each event is an ordinary ``Spectrum`` (with its ERS and FDS computed); all events must share
+the same natural-frequency range and material parameters.
+
+.. code-block:: python
+
+    import numpy as np
+    import matplotlib.pyplot as plt
+    import FatigueDS
+
+    # shared natural-frequency axis and material parameters for all events
+    freq_range = (20, 600, 5)
+    Q = 10
+    k, C, p = 7, 1.0, 1.0
+    freq = np.arange(20, 600, 1.0)  # PSD frequency axis (use smooth, measured-like PSDs)
+
+    # Event 1: road transport - broad low-frequency content, 3 hours
+    psd1 = 0.6 * np.exp(-0.5 * ((freq - 110) / 85) ** 2)  # (m/s^2)^2/Hz
+    road = FatigueDS.Spectrum(freq_data=freq_range, Q=Q)
+    road.set_random_load((psd1, freq), unit='ms2', T=3 * 3600)
+    road.get_ers()
+    road.get_fds(k=k, C=C, p=p)
+
+    # Event 2: engine running - resonance bump near 275 Hz, 1 hour, occurs 5 times
+    psd2 = 2.0 * np.exp(-0.5 * ((freq - 275) / 70) ** 2)
+    engine = FatigueDS.Spectrum(freq_data=freq_range, Q=Q)
+    engine.set_random_load((psd2, freq), unit='ms2', T=1 * 3600)
+    engine.get_ers()
+    engine.get_fds(k=k, C=C, p=p)
+
+    # combine the events: sum the FDS (damage accumulates), envelope the ERS
+    ms = FatigueDS.MissionSynthesis()
+    ms.add_event(road, repeats=1)
+    ms.add_event(engine, repeats=5)  # the engine event occurs 5 times
+    ms.combine()
+
+    # invert the reference FDS to an equivalent accelerated test PSD (30-minute test)
+    ms.invert(T_test=30 * 60)  # Lalanne's iteration method (eq [11.11]) by default
+    print('FDS reproduced to', f'{ms.invert_error:.1%}', 'in', ms.invert_n_iter, 'iterations')
+
+    # guard against over-testing: compare the test ERS to the reference ERS
+    ms.check_ers()
+    print('max test/reference ERS ratio:', np.max(ms.ers_ratio))
+
+    # plot the reference curves and the derived test PSD
+    ms.plot_fds()
+    ms.plot_ers()
+    ms.plot_test_psd()
+
+    # or access the results directly
+    fds_ref = ms.fds_ref
+    ers_ref = ms.ers_ref
+    test_psd = ms.test_psd
+    f = ms.f0_range  # frequency vector
+
+For an aggressive time compression (about 8 hours of life into a 30-minute test), the derived
+test exceeds the reference ERS and ``check_ers()`` emits an over-test warning; lengthening
+``T_test`` (a milder acceleration) reduces it. See the
+`mission synthesis documentation <https://fatigueds.readthedocs.io/en/latest/mission_synthesis.html>`_
+for the full example and practical guidance.
+
 
 References:
-    1. C. Lalanne, Mechanical Vibration and Shock: Specification development,
-    London, England: ISTE Ltd and John Wiley & Sons, 2009
+    1. C. Lalanne, Mechanical Vibration and Shock Analysis (2nd edition),
+    ISTE Ltd and John Wiley & Sons, 2009 - a five-volume set. This package draws on
+    Vol. 1 (Sinusoidal Vibration), Vol. 3 (Random Vibration), Vol. 4 (Fatigue Damage)
+    and Vol. 5 (Specification Development).
+
+    2. W. T. Thomson, Theory of Vibration with Applications (2nd edition),
+    Prentice-Hall, 1981.
