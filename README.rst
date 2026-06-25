@@ -279,3 +279,7 @@ References:
 
     2. W. T. Thomson, Theory of Vibration with Applications (2nd edition),
     Prentice-Hall, 1981.
+
+    3. J. Slavič, M. Mršnik, M. Česnik, J. Javh, M. Boltežar, Vibration Fatigue by Spectral
+    Methods: From Structural Dynamics to Fatigue Damage – Theory and Experiments, Elsevier,
+    2020 (ISBN 9780128221907).

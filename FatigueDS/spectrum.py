@@ -16,6 +16,10 @@ References
    Fatigue Damage*, 2nd ed., ISTE/Wiley, 2009.
 .. [Lalanne5] C. Lalanne, *Mechanical Vibration and Shock Analysis, Vol. 5:
    Specification Development*, 2nd ed., ISTE/Wiley, 2009.
+.. [Slavic] J. Slavič, M. Mršnik, M. Česnik, J. Javh, M. Boltežar, *Vibration Fatigue
+   by Spectral Methods: From Structural Dynamics to Fatigue Damage -- Theory and
+   Experiments*, Elsevier, 2020 (ISBN 9780128221907). A general reference for vibration
+   fatigue by spectral methods; the same convention is used by the FLife package.
 
 Notation note: the package renames Lalanne's material parameters ``b, K, C``
 (S-N slope, stress/relative-displacement proportionality, S-N constant) to
@@ -486,6 +490,10 @@ class Spectrum:
         eq. [7.34]; ERS definition [Lalanne5]_ ch. 2). FDS uses the narrow-band
         Rayleigh closed form [Lalanne4]_ p.144, eq. [4.41] = [Lalanne5]_ p.117,
         eqs. [4.7]-[4.8].
+
+        For a general treatment of vibration fatigue by spectral methods (spectral moments,
+        narrow-band and broadband fatigue-damage estimators) see [Slavic]_; this narrow-band
+        FDS equals the FLife narrow-band fatigue damage of the oscillator's stress response.
         """
 
         fds = np.zeros(len(self.f0_range))

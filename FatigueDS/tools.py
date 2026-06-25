@@ -12,6 +12,9 @@ References
    Specification Development*, 2nd ed., ISTE/Wiley, 2009.
 .. [Thomson] W. T. Thomson, *Theory of Vibration with Applications*, 2nd ed.,
    Prentice-Hall, 1981.
+.. [Slavic] J. Slavič, M. Mršnik, M. Česnik, J. Javh, M. Boltežar, *Vibration Fatigue
+   by Spectral Methods: From Structural Dynamics to Fatigue Damage -- Theory and
+   Experiments*, Elsevier, 2020 (ISBN 9780128221907).
 """
 
 import numpy as np
@@ -62,7 +65,8 @@ def rms_sum(f_0, psd_freq, psd_data, damp, motion='rel_disp'):
     response mean square is accumulated segment by segment using the closed-form
     integrals I0/I2/I4 (:func:`integrals_b`). This is the summation kernel of
     [Lalanne3]_ p.395, eq. [8.86]; the ``pi/(4*xi)`` and ``f0``-power prefactors are
-    applied by the caller in ``spectrum.py``.
+    applied by the caller in ``spectrum.py``. See [Slavic]_ for the spectral-moment
+    framework underlying these response-RMS and spectral-fatigue calculations.
 
     :param f_0: system natural frequency [Hz]
     :param psd_freq: PSD frequency range [Hz]
