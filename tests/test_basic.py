@@ -112,3 +112,77 @@ def test_narrowband_crossing_rate_equals_f0():
         assert np.isclose(rate, f0, rtol=0.02), f"f0={f0}: crossing rate {rate:.2f} != f0"
 
 
+class _SpectralDataLike:
+    """Minimal stand-in for ``FLife.SpectralData``: exposes ``.psd`` as the (N, 2)
+    [frequency, PSD] array that ``set_random_load`` reads. Lets us test the
+    SpectralData input branch without importing FLife (and its GUI dependencies)."""
+
+    def __init__(self, psd):
+        self.psd = np.asarray(psd)
+
+
+def test_set_random_load_accepts_spectraldata():
+    """A FLife.SpectralData-like object is accepted by set_random_load and yields the
+    same ERS/FDS as the equivalent (psd, freq) tuple input."""
+    freq = np.arange(0.0, 2000.0, 1.0)
+    psd = np.where((freq >= 50) & (freq <= 800), 2.0, 0.0)
+    fr = (20, 1000, 20)
+
+    ref = FatigueDS.Spectrum(freq_data=fr, Q=10)
+    ref.set_random_load((psd, freq), unit='ms2', T=100.0)
+    ref.get_ers()
+    ref.get_fds(k=6, C=1.0, p=1.0)
+
+    via = FatigueDS.Spectrum(freq_data=fr, Q=10)
+    via.set_random_load(_SpectralDataLike(np.column_stack((freq, psd))), unit='ms2', T=100.0)
+    via.get_ers()
+    via.get_fds(k=6, C=1.0, p=1.0)
+
+    assert via.signal_type == 'random_psd'
+    assert np.allclose(ref.ers, via.ers)
+    assert np.allclose(ref.fds, via.fds)
+
+
+def test_set_random_load_spectraldata_bad_shape_raises():
+    """A SpectralData-like object whose .psd is not (N, 2) is rejected."""
+    s = FatigueDS.Spectrum(freq_data=(20, 200, 5), Q=10)
+    with pytest.raises(ValueError):
+        s.set_random_load(_SpectralDataLike(np.arange(10.0)), unit='ms2', T=100.0)
+
+
+def test_set_random_load_spectraldata_requires_T():
+    """PSD input via a SpectralData still requires the duration T."""
+    freq = np.arange(0.0, 500.0, 1.0)
+    psd = np.ones_like(freq)
+    s = FatigueDS.Spectrum(freq_data=(20, 200, 5), Q=10)
+    with pytest.raises(ValueError):
+        s.set_random_load(_SpectralDataLike(np.column_stack((freq, psd))), unit='ms2')  # no T
+
+
+def _basquin_to_sn_reference(sigma_f, b, range=False):
+    """Independent oracle for the Basquin -> S-N convention (matches FLife.tools.basquin_to_sn)."""
+    k = -1.0 / b
+    if not range:
+        C = 0.5 * sigma_f ** k
+    else:
+        C = 0.5 * (2.0 * sigma_f) ** k
+    return C, k
+
+
+@pytest.mark.parametrize("range_flag", [False, True])
+def test_material_parameters_convert_to_basquin_roundtrip(range_flag):
+    """material_parameters_convert_to_basquin is the exact inverse of the Basquin -> S-N
+    convention (FLife-free; an independent oracle supplies the forward direction)."""
+    sigma_f, b = 800.0, -0.1
+    C, k = _basquin_to_sn_reference(sigma_f, b, range=range_flag)
+
+    sf, bb = FatigueDS.tools.material_parameters_convert_to_basquin(C, k, range=range_flag)
+    assert np.isclose(sf, sigma_f)
+    assert np.isclose(bb, b)
+
+    # explicit analytic forms
+    assert np.isclose(bb, -1.0 / k)
+    expected_sf = (2 * C) ** (1 / k) if not range_flag else 0.5 * (2 * C) ** (1 / k)
+    assert np.isclose(sf, expected_sf)
+
+

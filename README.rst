@@ -158,7 +158,128 @@ Here is an example of determining the ERS and FDS of a sine and sine-sweep signa
     load_spectrum_sine_sweep.plot_ers(label='sine sweep')
     load_spectrum_sine_sweep.plot_fds(label='sine sweep')
 
+Mission synthesis (test tailoring)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Mission synthesis combines the fatigue damage of several real-life vibration events into a
+reference FDS and ERS, and then *inverts* the reference FDS into an equivalent, accelerated
+laboratory test PSD. The FDS of the events are summed (fatigue damage accumulates), the ERS
+are enveloped (the extreme stress is the worst single event), and a final over-test guard
+compares the derived test ERS against the reference.
+
+Each event is an ordinary ``Spectrum`` (with its ERS and FDS computed); all events must share
+the same natural-frequency range and material parameters.
+
+.. code-block:: python
+
+    import numpy as np
+    import matplotlib.pyplot as plt
+    import FatigueDS
+
+    # shared natural-frequency axis and material parameters for all events
+    freq_range = (20, 600, 5)
+    Q = 10
+    k, C, p = 7, 1.0, 1.0
+    freq = np.arange(20, 600, 1.0)  # PSD frequency axis (use smooth, measured-like PSDs)
+
+    # Event 1: road transport - broad low-frequency content, 3 hours
+    psd1 = 0.6 * np.exp(-0.5 * ((freq - 110) / 85) ** 2)  # (m/s^2)^2/Hz
+    road = FatigueDS.Spectrum(freq_data=freq_range, Q=Q)
+    road.set_random_load((psd1, freq), unit='ms2', T=3 * 3600)
+    road.get_ers()
+    road.get_fds(k=k, C=C, p=p)
+
+    # Event 2: engine running - resonance bump near 275 Hz, 1 hour, occurs 5 times
+    psd2 = 2.0 * np.exp(-0.5 * ((freq - 275) / 70) ** 2)
+    engine = FatigueDS.Spectrum(freq_data=freq_range, Q=Q)
+    engine.set_random_load((psd2, freq), unit='ms2', T=1 * 3600)
+    engine.get_ers()
+    engine.get_fds(k=k, C=C, p=p)
+
+    # combine the events: sum the FDS (damage accumulates), envelope the ERS
+    ms = FatigueDS.MissionSynthesis()
+    ms.add_event(road, repeats=1)
+    ms.add_event(engine, repeats=5)  # the engine event occurs 5 times
+    ms.combine()
+
+    # invert the reference FDS to an equivalent accelerated test PSD (30-minute test)
+    ms.invert(T_test=30 * 60)  # Lalanne's iteration method (eq [11.11]) by default
+    print('FDS reproduced to', f'{ms.invert_error:.1%}', 'in', ms.invert_n_iter, 'iterations')
+
+    # guard against over-testing: compare the test ERS to the reference ERS
+    ms.check_ers()
+    print('max test/reference ERS ratio:', np.max(ms.ers_ratio))
+
+    # plot the reference curves and the derived test PSD
+    ms.plot_fds()
+    ms.plot_ers()
+    ms.plot_test_psd()
+
+    # or access the results directly
+    fds_ref = ms.fds_ref
+    ers_ref = ms.ers_ref
+    test_psd = ms.test_psd
+    f = ms.f0_range  # frequency vector
+
+For an aggressive time compression (about 8 hours of life into a 30-minute test), the derived
+test exceeds the reference ERS and ``check_ers()`` emits an over-test warning; lengthening
+``T_test`` (a milder acceleration) reduces it. See the
+`mission synthesis documentation <https://fatigueds.readthedocs.io/en/latest/mission_synthesis.html>`_
+for the full example and practical guidance.
+
+Interoperability with FLife
+---------------------------
+
+FatigueDS shares its S-N material convention (``k``, ``C``) with the
+`FLife <https://github.com/ladisk/FLife>`_ vibration-fatigue package, so the two work together
+without any parameter translation:
+
+- a ``FLife.SpectralData`` instance can be passed straight into ``set_random_load`` (its PSD is
+  used as a random PSD input);
+- the equivalent test PSD from mission synthesis can be handed back to FLife to estimate the
+  test life, via ``MissionSynthesis.to_flife_input()``;
+- Basquin parameters convert to and from the ``k``/``C`` form with
+  ``FatigueDS.tools.material_parameters_convert`` and ``material_parameters_convert_to_basquin``.
+
+.. code-block:: python
+
+    import numpy as np
+    import FLife
+    import FatigueDS
+
+    # a PSD and its frequency vector (e.g. measured), as for the random-PSD example above
+    freq = np.arange(0, 2000, 1.0)
+    psd = np.where((freq >= 50) & (freq <= 800), 2.0, 0.0)  # (m/s^2)^2/Hz
+
+    # 1. use a FLife SpectralData (PSD) directly as a FatigueDS random load
+    sd = FLife.SpectralData(input={'PSD': psd, 'f': freq})
+    load_spectrum = FatigueDS.Spectrum(freq_data=(20, 1000, 20), Q=10)
+    load_spectrum.set_random_load(sd, unit='ms2', T=3600)
+    load_spectrum.get_fds(k=7, C=1.0, p=1.0)
+
+    # 2. hand a tailored mission-synthesis test PSD back to FLife for life estimation
+    #    (ms is the MissionSynthesis object from the example above, after invert())
+    sd_test = FLife.SpectralData(input=ms.to_flife_input())
+    life = FLife.Narrowband(sd_test).get_life(C=ms.C, k=ms.k)
+
+    # 3. convert Basquin parameters (sigma_f, b) <-> fatigue-life parameters (C, k)
+    C, k = FatigueDS.tools.material_parameters_convert(sigma_f=800.0, b=-0.1)
+    sigma_f, b = FatigueDS.tools.material_parameters_convert_to_basquin(C, k)
+
+The relationship is exact: the FatigueDS random-vibration FDS at each natural frequency equals
+the FLife narrow-band damage of that oscillator's stress response, so both packages agree on
+the narrow-band fatigue damage of a given PSD.
+
 
 References:
-    1. C. Lalanne, Mechanical Vibration and Shock: Specification development,
-    London, England: ISTE Ltd and John Wiley & Sons, 2009
+    1. C. Lalanne, Mechanical Vibration and Shock Analysis (2nd edition),
+    ISTE Ltd and John Wiley & Sons, 2009 - a five-volume set. This package draws on
+    Vol. 1 (Sinusoidal Vibration), Vol. 3 (Random Vibration), Vol. 4 (Fatigue Damage)
+    and Vol. 5 (Specification Development).
+
+    2. W. T. Thomson, Theory of Vibration with Applications (2nd edition),
+    Prentice-Hall, 1981.
+
+    3. J. Slavič, M. Mršnik, M. Česnik, J. Javh, M. Boltežar, Vibration Fatigue by Spectral
+    Methods: From Structural Dynamics to Fatigue Damage – Theory and Experiments, Elsevier,
+    2020 (ISBN 9780128221907).
