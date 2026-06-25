@@ -16,9 +16,8 @@ References
 
 import numpy as np
 from scipy import signal
-from FLife.tools import basquin_to_sn
 
-def convert_Q_damp(self, Q=None, damp=None): 
+def convert_Q_damp(self, Q=None, damp=None):
     """
     Function for converting damping ratio to Q-factor and vice versa.
 
@@ -212,18 +211,59 @@ def material_parameters_convert(sigma_f, b, range = False):
     using a function from FLife package. Basic form of Basquin equation is used here: ``sigma_a = sigma_f* (2*N)**b``. The function converts to parameters from equation ``N * s**k = C``
     (the S-N / Basquin law, [Lalanne4]_ p.22, eqs. [1.13]-[1.15]).
 
+    The returned ``C`` and ``k`` therefore use exactly the same convention as the FLife
+    package (the ``C``/``k`` of ``FLife.SpectralData.get_life`` and the FDS material parameters
+    of :class:`~FatigueDS.spectrum.Spectrum`), so the values can be shared between the two
+    packages. ``FLife`` is imported lazily here so that importing FatigueDS does not pull in
+    FLife (and its optional GUI dependencies) unless this conversion is actually used. The
+    inverse conversion is :func:`material_parameters_convert_to_basquin`.
+
     :param sigma_f:
         Fatigue strength coefficient [MPa**k].
     :param b:
         Fatigue strength exponent [/]. Represents S-N curve slope.
     :param range:
         False/True sets returned value C with regards to amplitude / range count, respectively.
-    
+
     :return C,k:
         C - S-N curve intercept [MPa**k], k - S-N curve inverse slope [/].
 
     """
 
+    from FLife.tools import basquin_to_sn  # lazy import: keep FLife (and its GUI imports) optional
+
     C,k = basquin_to_sn(sigma_f, b, range=range)
-    
-    return C, k 
+
+    return C, k
+
+
+def material_parameters_convert_to_basquin(C, k, range=False):
+    """
+    Inverse of :func:`material_parameters_convert`: convert the fatigue-life parameters ``C``
+    and ``k`` of the S-N / Basquin law ``N * s**k = C`` back to the Basquin coefficient and
+    exponent ``sigma_f`` and ``b`` of ``sigma_a = sigma_f * (2*N)**b``.
+
+    This is the analytic inverse of FLife's ``basquin_to_sn`` (FLife provides only the forward
+    direction) and uses the identical convention, so ``(sigma_f, b)`` round-trips with both
+    :func:`material_parameters_convert` and ``FLife.tools.basquin_to_sn``. Being analytic, it
+    does not import FLife.
+
+    :param C:
+        S-N curve intercept [MPa**k].
+    :param k:
+        S-N curve inverse slope [/].
+    :param range:
+        False/True if ``C`` was defined with regards to amplitude / range count, respectively
+        (must match the value used in the forward conversion).
+
+    :return sigma_f, b:
+        sigma_f - fatigue strength coefficient [MPa], b - fatigue strength exponent [/].
+    """
+
+    b = -1.0 / k
+    if not range:
+        sigma_f = (2.0 * C) ** (1.0 / k)
+    else:
+        sigma_f = 0.5 * (2.0 * C) ** (1.0 / k)
+
+    return sigma_f, b

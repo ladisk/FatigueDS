@@ -165,17 +165,33 @@ class Spectrum:
         """
         Set random signal load parameters
 
-        :param signal_data: tuple containing (time history data, dt) or (psd data, frequency vector)
+        :param signal_data: tuple containing (time history data, dt) or (psd data, frequency vector),
+                            or a ``FLife.SpectralData`` instance (its one-sided PSD is used as a PSD input)
         :param T: time duration [s]
         :param unit: unit of the signal (supported: 'g' and 'ms2') Parameter only needed for fds calculation
-        :param method: method to calculate ERS and FDS (supported: 'convolution' and 'psd_averaging'). 
+        :param method: method to calculate ERS and FDS (supported: 'convolution' and 'psd_averaging').
                        Only needed for random time signal
         :param bins: number of bins for PSD averaging method. Only neede for psd averaging method
         """
 
+        # FLife interoperability: a FLife.SpectralData carries its PSD in ``.psd`` as an
+        # (N, 2) array [frequency, PSD]; use it directly as a random_psd input. Duck-typed so
+        # that FLife need not be imported here.
+        if signal_data is not None and not isinstance(signal_data, tuple) and hasattr(signal_data, 'psd'):
+            psd_arr = np.asarray(signal_data.psd)
+            if psd_arr.ndim != 2 or psd_arr.shape[1] != 2:
+                raise ValueError('Unsupported ``SpectralData``: expected a uniaxial (N, 2) PSD array')
+            self.signal_type = 'random_psd'
+            self.psd_freq = psd_arr[:, 0]
+            self.psd_data = psd_arr[:, 1]
+            if isinstance(T, (int, float)):
+                self.T = T
+            else:
+                raise ValueError('Time duration ``T`` must be provided')
+
         # Signal data must be a tuple
-        if isinstance(signal_data, tuple) and len(signal_data) == 2:
-        
+        elif isinstance(signal_data, tuple) and len(signal_data) == 2:
+
         # If input is time signal
             if isinstance(signal_data[0], np.ndarray) and isinstance(signal_data[1], (int, float)):
                 self.signal_type = 'random_time'

@@ -258,6 +258,28 @@ class MissionSynthesis:
                 f"{self.f0_range[i]:.1f} Hz): possible over-test")
         return self
 
+    def to_flife_input(self):
+        """Return the derived test PSD as a ``FLife.SpectralData`` dictionary input.
+
+        This closes the test-tailoring -> life-estimation loop with the FLife package: the
+        equivalent test PSD produced by :meth:`invert` is handed to FLife to estimate the
+        fatigue life (or verify the achieved damage) of the test specification, e.g.::
+
+            import FLife
+            sd = FLife.SpectralData(input=ms.to_flife_input())
+            life = FLife.Narrowband(sd).get_life(C=ms.C, k=ms.k)
+
+        The material parameters ``ms.k``/``ms.C`` (and FatigueDS in general) use the same S-N
+        convention as FLife, so no parameter translation is needed. Requires :meth:`invert` to
+        have been called.
+
+        :return: ``{'PSD': test_psd, 'f': test_psd_freq}`` (the dictionary form accepted by
+            ``FLife.SpectralData``).
+        """
+        if not hasattr(self, 'test_psd'):
+            raise ValueError("call invert() before to_flife_input()")
+        return {'PSD': self.test_psd, 'f': self.test_psd_freq}
+
     def plot_fds(self, new_figure=True, **kwargs):
         """Plot the reference (combined) fatigue damage spectrum."""
         if not hasattr(self, 'fds_ref'):

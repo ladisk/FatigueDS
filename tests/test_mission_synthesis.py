@@ -285,3 +285,22 @@ def test_plot_before_combine_raises():
     ms = MissionSynthesis([_make_event()])
     with pytest.raises(ValueError):
         ms.plot_fds()
+
+
+def test_to_flife_input_returns_psd_dict():
+    """to_flife_input() returns the derived test PSD in FLife's dict form."""
+    ms = MissionSynthesis([_psd_event()])
+    ms.combine()
+    ms.invert(3600.0, method='closed_form')
+
+    d = ms.to_flife_input()
+    assert set(d) == {'PSD', 'f'}
+    assert np.allclose(d['PSD'], ms.test_psd)
+    assert np.allclose(d['f'], ms.test_psd_freq)
+
+
+def test_to_flife_input_before_invert_raises():
+    ms = MissionSynthesis([_psd_event()])
+    ms.combine()
+    with pytest.raises(ValueError):
+        ms.to_flife_input()
