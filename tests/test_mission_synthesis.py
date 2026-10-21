@@ -16,6 +16,7 @@ F0_RANGE = np.arange(20, 605, 5.0)
 G = 0.5 * np.exp(-0.5 * ((F0_RANGE - 250) / 80)**2) + 0.05  # (m/s^2)^2/Hz, with a floor
 T = 3600
 DATA = os.path.join(my_path, '..', 'test_data', 'lalanne_ex11_2_{}.csv')  # digitized [Lalanne5] Example 11.2
+DATA_11_3 = os.path.join(my_path, '..', 'test_data', 'lalanne_ex11_3_{}.csv')  # digitized [Lalanne5] Example 11.3
 
 
 def _event(psd, freq, T, k, unit='ms2', f0=F0, Q=10):
@@ -186,6 +187,42 @@ def test_example_11_2():
         warnings.simplefilter('error')
         ms.invert(5 * 60).check_ers()
     np.testing.assert_allclose(ms.ers_ratio[ms.f0_range > 25], 1, rtol=0.03, atol=0)
+
+
+def test_example_11_3():
+    """[Lalanne5] p.319-320, Example 11.3: aircraft 2 h and helicopter 3 h, Q=10, b=10,
+    1 h test PSD compared level by level with the staircase of Fig. 11.30."""
+    f0 = (10, 2500, 5)  # the helicopter PSD starts at 9 Hz
+    events = []
+    for name, T_event in [('aircraft', 2 * 3600), ('helicopter', 3 * 3600)]:
+        freq, psd = np.loadtxt(DATA_11_3.format('psd_' + name), delimiter=',').T
+        events.append(_event(psd, freq, T_event, k=10, f0=f0))
+    with warnings.catch_warnings():
+        warnings.simplefilter('error')
+        ms = MissionSynthesis(events).invert(3600)
+
+    # rms 10.11 vs 10.1 printed. Not tighter: the digitized helicopter rms is 7.04
+    # (book 7.47), and with both inputs scaled to the printed rms the test rms is 10.4.
+    df = ms.f0_range[1] - ms.f0_range[0]
+    assert abs(np.sqrt(ms.test_psd.sum() * df) / 10.1 - 1) < 0.04
+
+    # mean of the test PSD over each book band (energy preserving), for the 26 levels
+    # above 0.007 (smaller ones read as 0)
+    lo, hi, level = np.loadtxt(DATA_11_3.format('psd_spec'), delimiter=',').T
+    lo, hi, level = lo[level > 0.007], hi[level > 0.007], level[level > 0.007]
+    cum = np.r_[0, np.cumsum(ms.test_psd * df)]
+    edges = np.r_[ms.f0_range - df / 2, ms.f0_range[-1] + df / 2]
+    ratio = np.diff(np.interp(np.c_[lo, hi], edges, cum), axis=1)[:, 0] / (hi - lo) / level
+
+    # above 800 Hz the aircraft dominates and its digitization is good (rms 7.56 vs 7.58):
+    # the 8 levels are within 0.90-1.12 of the book
+    np.testing.assert_allclose(ratio[lo > 800], 1, rtol=0.15, atol=0)
+    # main peak, 329-367 Hz: 0.44 vs 0.54 (ratio 0.82)
+    assert abs(ratio[np.argmax(np.where(lo > 35, level, 0))] - 1) < 0.25
+    # all 26 levels: median ratio 0.89. Next to narrow helicopter peaks 0.3-0.7 (peaks
+    # underestimated on its linear-frequency raster), below 35 Hz up to 4 (spike position
+    # uncertain by about 5 Hz).
+    assert 0.8 < np.median(ratio) < 1.1
 
 
 def test_invert_converges_without_floor():

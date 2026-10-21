@@ -139,3 +139,11 @@ the test puts 20 hours of truck damage into 5 minutes.
 Compared with the digitized book curves, the median ratio is 1.01 for the reference
 ERS (Fig. 11.26), 0.96 for the 5 hour test ERS (Fig. 11.26) and 0.99 for the 5 minute
 test ERS (Fig. 11.28).
+
+The test PSD itself is checked against Example 11.3 of the book (p.319-320): an
+aircraft flight of 2 hours and a helicopter flight of 3 hours, Q = 10, b = 10, test
+duration 1 hour. With the digitized input PSDs, the rms of the test PSD is 10.11 m/s²
+(book 10.1 m/s²). Above 800 Hz the mean levels over the book bands are 0.90 to 1.12
+times the book levels (Fig. 11.30). Next to the narrow helicopter peaks they are lower,
+because these peaks are difficult to digitize. The data are in ``test_data``
+(``lalanne_ex11_3_*.csv``).
