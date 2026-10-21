@@ -147,3 +147,9 @@ duration 1 hour. With the digitized input PSDs, the rms of the test PSD is 10.11
 times the book levels (Fig. 11.30). Next to the narrow helicopter peaks they are lower,
 because these peaks are difficult to digitize. The data are in ``test_data``
 (``lalanne_ex11_3_*.csv``).
+
+In Example 12.3 of the book (p.349-351), a 10 hour aircraft vibration becomes a 1 hour test
+with b = 8 and Q = 5, 10 and 20: the test PSD is 10^(2/8) times the aircraft PSD, rms
+10.09 m/s² (book 10.08 to 10.11 m/s²), and its mean levels over the bands of the book's
+40-point specifications (Fig. 12.14, ``lalanne_ex12_3_psd_spec.csv``) have a median ratio
+of 1.00 to 1.01.

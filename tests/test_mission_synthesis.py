@@ -17,6 +17,7 @@ G = 0.5 * np.exp(-0.5 * ((F0_RANGE - 250) / 80)**2) + 0.05  # (m/s^2)^2/Hz, with
 T = 3600
 DATA = os.path.join(my_path, '..', 'test_data', 'lalanne_ex11_2_{}.csv')  # digitized [Lalanne5] Example 11.2
 DATA_11_3 = os.path.join(my_path, '..', 'test_data', 'lalanne_ex11_3_{}.csv')  # digitized [Lalanne5] Example 11.3
+DATA_12_3 = os.path.join(my_path, '..', 'test_data', 'lalanne_ex12_3_{}.csv')  # digitized [Lalanne5] Example 12.3
 
 
 def _event(psd, freq, T, k, unit='ms2', f0=F0, Q=10):
@@ -223,6 +224,45 @@ def test_example_11_3():
     # underestimated on its linear-frequency raster), below 35 Hz up to 4 (spike position
     # uncertain by about 5 Hz).
     assert 0.8 < np.median(ratio) < 1.1
+
+
+@pytest.mark.parametrize('Q, rms_book', [(5, 10.08), (10, 10.11), (20, 10.11)])
+def test_example_12_3(Q, rms_book):
+    """[Lalanne5] p.349-351, Example 12.3: aircraft 10 h (Fig. 12.5), b=8, 1 h test PSD
+    compared with the 40-point specifications of Fig. 12.14."""
+    freq, psd = np.loadtxt(DATA_11_3.format('psd_aircraft'), delimiter=',').T  # same Fig. 12.5 data
+    with warnings.catch_warnings():
+        warnings.simplefilter('error')
+        ms = MissionSynthesis([_event(psd, freq, 10 * 3600, k=8, f0=(10, 2500, 5), Q=Q)]).invert(3600)
+    df = ms.f0_range[1] - ms.f0_range[0]
+
+    # rms 10.09 vs 10.08-10.11 printed: the digitized input rms is 7.564 (book 7.58), and
+    # tol = 0.05 on the FDS allows about 1.2 % on the level
+    assert abs(np.sqrt(ms.test_psd.sum() * df) / rms_book - 1) < 0.01
+
+    # one event: test PSD = aircraft PSD * (10 h / 1 h)**(2/b) (p.349, [Lalanne5] eq [4.14]);
+    # median ratio 1.778-1.789 above 100 Hz
+    i = (ms.f0_range > 100) & (ms.f0_range < 2400)
+    ratio = ms.test_psd[i] / np.interp(ms.f0_range[i], freq, psd)
+    assert abs(np.median(ratio) / 10**(2 / 8) - 1) < 0.01
+
+    # mean of the test PSD over each book band (energy preserving) against the mean of the
+    # book lines of the band (which line is which Q is not printed)
+    lo, hi, *lines = np.loadtxt(DATA_12_3.format('psd_spec'), delimiter=',').T
+    book = np.nanmean(lines, axis=0)
+    cum = np.r_[0, np.cumsum(ms.test_psd * df)]
+    edges = np.r_[ms.f0_range - df / 2, ms.f0_range[-1] + df / 2]
+    hi = np.minimum(hi, edges[-1])  # the last book band ends at 2683 Hz
+    energy = np.diff(np.interp(np.c_[lo, hi], edges, cum), axis=1)[:, 0]
+    ratio = energy / (hi - lo) / book
+
+    # 24 levels above 0.005: median ratio 1.00-1.01. The book's 40 points smooth the PSD, so
+    # single bands differ (p10-p90 0.69-1.40); 370-2329 Hz (13 bands): 0.90-1.21
+    assert abs(np.median(ratio[book > 0.005]) - 1) < 0.03
+    np.testing.assert_allclose(ratio[(lo > 360) & (lo < 2300)], 1, rtol=0.25, atol=0)
+    # energy 100-2329 Hz (97 % of the total): 0.997-0.999 of the book (digitized input 0.996)
+    band = (lo > 100) & (lo < 2300)
+    assert abs(energy[band].sum() / (book[band] * (hi - lo)[band]).sum() - 1) < 0.02
 
 
 def test_invert_converges_without_floor():
