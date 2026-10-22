@@ -1,3 +1,7 @@
+.. image:: https://raw.githubusercontent.com/ladisk/FatigueDS/master/docs/source/_static/logo.png
+   :alt: FatigueDS
+   :width: 480
+
 FatigueDS
 -----------------------
 
