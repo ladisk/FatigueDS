@@ -96,7 +96,7 @@ Set the sine-sweep load with the following parameters:
 
 * ``exc_type`` - excitation type. Possible values are ``acc``, ``vel`` and ``disp`` 
 
-* ``dt`` - time step
+* ``dt`` - not used, kept for backward compatibility
 
 * ``sweep_type`` - sweep type. Possible values are ``log`` and ``lin``
 
