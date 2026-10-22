@@ -36,21 +36,12 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "License :: OSI Approved :: MIT License",
 ]
-
-[[project.authors]]
-name = "Jaša Šonc"
-email = "jasa.sonc@fs.uni-lj.si"
-
-[[project.authors]]
-name = "Martin Česnik"
-email = "jankmartin.cesnik@fs.uni-lj.si"
-
-[[project.authors]]
-name = "Rok Pavlin"
-
-[[project.authors]]
-name = "Janko Slavič"
-email = "janko.slavic@fs.uni-lj.si"
+authors = [
+    { name = "Jaša Šonc", email = "jasa.sonc@fs.uni-lj.si" },
+    { name = "Martin Česnik", email = "jankmartin.cesnik@fs.uni-lj.si" },
+    { name = "Rok Pavlin" },
+    { name = "Janko Slavič", email = "janko.slavic@fs.uni-lj.si" },
+]
 
 [project.optional-dependencies]
 dev = [
