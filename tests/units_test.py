@@ -59,3 +59,31 @@ class TestUnits:
 
         assert np.allclose(load_spectrum_psd_g.ers * 9.81, load_spectrum_psd_ms2.ers)
         assert np.allclose(load_spectrum_psd_g.fds, load_spectrum_psd_ms2.fds)
+
+    def test_units_sine(self):
+        f0 = np.array([50., 150, 200, 300, 900])
+        sp_g = FatigueDS.Spectrum(freq_data=f0, Q=10)
+        sp_ms2 = FatigueDS.Spectrum(freq_data=f0, Q=10)
+        sp_g.set_sine_load(sine_freq=200, amp=2, t_total=100, unit='g')
+        sp_ms2.set_sine_load(sine_freq=200, amp=2 * 9.81, t_total=100, unit='ms2')
+        sp_g.get_ers()
+        sp_ms2.get_ers()
+        sp_g.get_fds(k=5, C=1, p=1)
+        sp_ms2.get_fds(k=5, C=1, p=1)
+
+        assert np.allclose(sp_g.ers * 9.81, sp_ms2.ers, rtol=1e-12, atol=0)  # holds before the fix too
+        assert np.allclose(sp_g.fds, sp_ms2.fds, rtol=1e-12, atol=0)
+
+    def test_units_sine_sweep(self):
+        f0 = np.array([15., 50, 150, 300, 900])
+        sp_g = FatigueDS.Spectrum(freq_data=f0, Q=10)
+        sp_ms2 = FatigueDS.Spectrum(freq_data=f0, Q=10)
+        sp_g.set_sine_sweep_load(const_amp=[2, 4], const_f_range=[10, 100, 1000], sweep_type='log', sweep_rate=1, unit='g')
+        sp_ms2.set_sine_sweep_load(const_amp=[2 * 9.81, 4 * 9.81], const_f_range=[10, 100, 1000], sweep_type='log', sweep_rate=1, unit='ms2')
+        sp_g.get_ers()
+        sp_ms2.get_ers()
+        sp_g.get_fds(k=5, C=1, p=1)
+        sp_ms2.get_fds(k=5, C=1, p=1)
+
+        assert np.allclose(sp_g.ers * 9.81, sp_ms2.ers, rtol=1e-12, atol=0)  # holds before the fix too
+        assert np.allclose(sp_g.fds, sp_ms2.fds, rtol=1e-12, atol=0)

@@ -124,7 +124,7 @@ class Spectrum:
         :param const_amp: constant amplitude ranges  [m/s^2, m/s, m]
         :param const_f_range: constant frequency ranges [Hz]
         :param exc_type: excitation type (supported: 'acc [m/s^2]', 'vel[m/s]' and 'disp[m]')
-        :param dt: time step [s] (default 1 second)
+        :param dt: not used, kept for backward compatibility (the FDS integral uses adaptive quadrature)
         :param sweep_type: sine sweep type (['linear','lin'] or ['logarithmic','log']) 
         :param sweep_rate: sinusoidal sweep rate [Hz/min] for 'linear' and [oct./min] for 'logarithmic' sweep type
         :param unit: unit of the signal (supported: 'g' and 'ms2') Parameter only needed for fds calculation
@@ -257,8 +257,9 @@ class Spectrum:
 
         ``sigma_p = p * z_p``
 
-        Correct unit must be selected in `set_random_load` method. If unit is ``g``, signal is scaled to ``m/s^2`` 
+        Correct unit must be selected in the `set_*_load` method. If unit is ``g``, signal is scaled to ``m/s^2`` 
         before FDS calculation, because the FDS theory is based on SI base units.
+        Unit ``g`` only makes sense for ``exc_type='acc'``, it also scales ``vel`` and ``disp`` amplitudes by 9.81.
 
         NOTE:
         Naming of material parameters slightly differs from the notation in literature by Lalanne (``b,C,K`` -> ``k,C,p``).
@@ -371,8 +372,8 @@ class Spectrum:
         # Getting the ERS with self.get_ers()
         if output == 'ERS':
 
-            # [Lalanne5] p.7 eq [1.7]: steady-state SDOF response, R = omega_0**2 * z_m
-            R_i = -self.amp * (omega_0i)**self.a / (np.sqrt((1 - (self.sine_freq / self.f0_range)**2)**2 + (self.sine_freq / (self.Q * self.f0_range))**2))
+            # [Lalanne5] p.7 eq [1.7] and p.8 eq [1.11]: steady-state SDOF response, R = E_m * Omega**a / |H|, Omega = 2*pi*sine_freq
+            R_i = -self.amp * (2 * np.pi * self.sine_freq)**self.a / (np.sqrt((1 - (self.sine_freq / self.f0_range)**2)**2 + (self.sine_freq / (self.Q * self.f0_range))**2))
             return np.abs(R_i)
 
         # Getting the FDS with self.get_fds()
@@ -383,7 +384,7 @@ class Spectrum:
 
             h = self.sine_freq / self.f0_range
             # [Lalanne5] p.98 eq [3.19]: D = K**b/C * f0*T * E_m**b * omega_0**(b(a-2)) * h**(ab+1) / [(1-h**2)**2 + (h/Q)**2]**(b/2)
-            D_i = self.p**self.k / self.C * self.f0_range * self.t_total * self.amp**self.k * omega_0i**(self.k * (self.a - 2)) * h**(self.a * self.k + 1) / ((1 - h**2)**2 + (h / self.Q)**2)**(self.k / 2)
+            D_i = self.p**self.k / self.C * self.f0_range * self.t_total * (self.amp * self.unit_scale)**self.k * omega_0i**(self.k * (self.a - 2)) * h**(self.a * self.k + 1) / ((1 - h**2)**2 + (h / self.Q)**2)**(self.k / 2)
             return D_i
         
     def _get_sine_sweep_ers_fds(self, output=None):
@@ -394,7 +395,8 @@ class Spectrum:
               f1 <= f0 <= f2), [1.32] (f0 < f1) and [1.33] (f0 > f2).
         FDS:  swept-sine damage master integral, [Lalanne5]_ p.120, eq. [3.65],
               with the dwell-weighting function M(h) from [Lalanne5]_ Table 3.2
-              (linear: h**2/(h2-h1); logarithmic: h/ln(h2/h1)). Sweep-time and the
+              (linear: h**2/(h2-h1); logarithmic: h/ln(h2/h1), with h1, h2 the limits of the
+              whole sweep, F1/f0 and F_{n+1}/f0, [Lalanne5]_ eq. [3.66]). Sweep-time and the
               dh change of variable follow [Lalanne1]_ ch. 8 / [Lalanne5]_ p.103-114
               (linear rate in Hz/min, eq. [3.39]; logarithmic rate in oct./min).
         Assumes the sweep is slow enough to reach steady state at each frequency
@@ -416,28 +418,26 @@ class Spectrum:
                 h2 = f2 / self.f0_range[i]
 
                 if output == 'FDS':
+                    F1 = self.const_f_range[0]
+                    F2 = self.const_f_range[-1]
                     if self.sweep_type is None:
                         raise ValueError("You need to provide either ['linear','lin'] or ['logarithmic','log'] sweep_type.")
                     elif self.sweep_type in ['lin', 'linear']:
-                        tb = (self.const_f_range[-1] - self.const_f_range[0]) / self.sweep_rate * 60  # sinusoidal sweep time [s] -> from [Hz/min] ([Lalanne1] ch.8)
-                        dh = (f2 - f1) * self.dt / (self.f0_range[i] * tb)  # [Lalanne5] p.104 eq [3.39]
-                        h = np.arange(h1, h2, dh)
-                        M_h = h**2 / (h2 - h1)  # linear dwell weighting M(h), [Lalanne5] Table 3.2
+                        tb = (F2 - F1) / self.sweep_rate * 60  # sinusoidal sweep time [s] -> from [Hz/min] ([Lalanne1] ch.8)
+                        M_h = lambda h: h**2 / ((F2 - F1) / self.f0_range[i])  # linear dwell weighting M(h) over the whole sweep, [Lalanne5] Table 3.2, eq [3.66]
                     elif self.sweep_type in ['log', 'logarithmic']:
-                        tb = 60 * np.log(self.const_f_range[-1] / self.const_f_range[0]) / (self.sweep_rate * np.log(2))  # logarithmic sweep time [s] -> from [oct./min] ([Lalanne1] ch.8)
-                        t = np.arange(0, tb, self.dt)
-                        T1 = tb / np.log(h2 / h1)  # log-sweep time constant, f(t)=f1*exp(t/T1) ([Lalanne5] p.114)
-                        f_t = f1 * np.exp(t / T1)
-                        dh = f1 / (T1 * self.f0_range[i]) * np.exp(t / T1) * self.dt
-                        h = f_t / self.f0_range[i]
-                        M_h = h / (np.log(h2 / h1))  # exponential dwell weighting M(h), [Lalanne5] Table 3.2
+                        tb = 60 * np.log(F2 / F1) / (self.sweep_rate * np.log(2))  # logarithmic sweep time [s] -> from [oct./min] ([Lalanne1] ch.8)
+                        M_h = lambda h: h / np.log(F2 / F1)  # exponential dwell weighting M(h) over the whole sweep, [Lalanne5] Table 3.2, eq [3.66]
                     else:
                         raise ValueError(f"Invalid method `method`='{self.sweep_type}'. Supported sweep types: 'lin' and 'log'.")
 
                     # swept-sine FDS master integral, [Lalanne5] p.120 eq [3.65]:
                     # D = K**b/C * f0*tb * E_m**b * omega_0**(b(a-2)) * integral( M(h) h**(ab-1) / [(1-h**2)**2+(h/Q)**2]**(b/2) dh )
-                    const = self.p**self.k / self.C * self.f0_range[i] * tb * amp**self.k * omega_0i**(self.k * (self.a - 2))
-                    integral = scipy.integrate.trapezoid(M_h * h**(self.a * self.k - 1) / ((1 - h**2)**2 + (h / self.Q)**2)**(self.k / 2), x=h)
+                    const = self.p**self.k / self.C * self.f0_range[i] * tb * (amp * self.unit_scale)**self.k * omega_0i**(self.k * (self.a - 2))
+                    integrand = lambda h: M_h(h) * h**(self.a * self.k - 1) / ((1 - h**2)**2 + (h / self.Q)**2)**(self.k / 2)
+                    # adaptive quadrature, split around the resonance peak (h=1, width ~1/Q)
+                    edges = [h1] + [x for x in (1 - 10 / self.Q, 1 - 1 / self.Q, 1, 1 + 1 / self.Q, 1 + 10 / self.Q) if h1 < x < h2] + [h2]
+                    integral = sum(scipy.integrate.quad(integrand, lo, hi, epsabs=0, limit=200)[0] for lo, hi in zip(edges[:-1], edges[1:]))
                     fds[i] += const * integral
 
                 elif output == 'ERS':
