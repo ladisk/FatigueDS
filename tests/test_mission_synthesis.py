@@ -80,12 +80,20 @@ def test_combine_sum_and_envelope():
     assert np.any(low.ers > high.ers) and np.any(high.ers > low.ers)
 
 
-def _sine_event_g():
+def _sine_event(amp, unit):
     s = FatigueDS.Spectrum(freq_data=F0, Q=10)
-    s.set_sine_load(sine_freq=200, amp=1, t_total=T, unit='g')
+    s.set_sine_load(sine_freq=200, amp=amp, t_total=T, unit=unit)
     s.get_ers()
     s.get_fds(k=6)
     return s
+
+
+def test_sine_event_in_g():
+    ms_g = MissionSynthesis([_sine_event(1, 'g')])
+    ms_si = MissionSynthesis([_sine_event(9.81, 'ms2')])
+    ms_g.combine()
+    ms_si.combine()
+    np.testing.assert_allclose(ms_g.fds_ref, ms_si.fds_ref, rtol=1e-12, atol=0)
 
 
 def _base():
@@ -101,7 +109,6 @@ def _base():
     (lambda: [_event(G, F0_RANGE, T, 6, f0=np.geomspace(20, 600, 60))], 'uniformly spaced'),
     (lambda: [_event(G, F0_RANGE, T, 6, f0=(0, 600, 5))], 'above 0 Hz'),
     (lambda: [_event(0 * G, F0_RANGE, T, 6)], 'positive'),
-    (lambda: [_sine_event_g()], 'sine'),
     (lambda: [], 'no events'),
 ])
 @pytest.mark.filterwarnings('ignore::RuntimeWarning')  # ERS of a zero PSD is 0/0

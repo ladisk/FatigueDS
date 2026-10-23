@@ -88,9 +88,6 @@ class MissionSynthesis:
         params = {(e.k, e.C, e.p, e.damp, e.unit_scale) for e in self.events}
         if len(params) > 1:
             raise ValueError('All events must have the same k, C, p, damping and unit')
-        # ponytail: drop this guard once the sine and sine-sweep FDS apply unit_scale.
-        if any(e.signal_type in ('sine', 'sine_sweep') and e.unit_scale != 1 for e in self.events):
-            raise ValueError("The sine and sine-sweep FDS ignore ``unit='g'``: use ``unit='ms2'``")
 
         self.f0_range = f0
         self.k, self.C, self.p, self.damp, self.unit_scale = params.pop()
