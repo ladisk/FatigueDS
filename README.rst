@@ -158,6 +158,24 @@ Here is an example of determining the ERS and FDS of a sine and sine-sweep signa
     load_spectrum_sine_sweep.plot_ers(label='sine sweep')
     load_spectrum_sine_sweep.plot_fds(label='sine sweep')
 
+Mission synthesis
+~~~~~~~~~~~~~~~~~
+
+Mission synthesis gives one random vibration test PSD that has the same fatigue damage
+as all the events of a life cycle profile, in a shorter test duration [1]. Each event is
+a ``Spectrum`` with its ERS and FDS. The events must have the same ``freq_data``,
+damping, material parameters and unit.
+
+.. code-block:: python
+
+    # truck and missile are Spectrum objects with get_ers() and get_fds() done
+    ms = FatigueDS.MissionSynthesis([truck, missile])
+    ms.invert(T_test=5 * 60)  # test PSD: ms.test_psd on ms.f0_range
+    ms.check_ers()            # compare the test ERS with the reference ERS
+
+See the `mission synthesis example <https://fatigueds.readthedocs.io/en/latest/mission_synthesis.html>`_
+(Example 11.2 of [1]: truck transport and missile flight).
+
 
 References:
     1. C. Lalanne, Mechanical Vibration and Shock: Specification development,

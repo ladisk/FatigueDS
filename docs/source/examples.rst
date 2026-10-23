@@ -8,3 +8,4 @@ Examples of using FatigueDS are provided for different types of signals:
 
    random_signal
    sine_sine_sweep_signal
+   mission_synthesis
