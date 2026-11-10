@@ -27,7 +27,7 @@ dependencies = [
     "tqdm",
     "pyExSi",
     "rainflow",
-    "FLife",
+    "FLife>=3.0.1",
 ]
 classifiers = [
     "Development Status :: 4 - Beta",
