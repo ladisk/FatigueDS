@@ -5,4 +5,4 @@ matplotlib
 tqdm
 pyExSi
 rainflow
-FLife
+FLife>=3.0.1
