@@ -23,13 +23,26 @@ Notation note: the package renames Lalanne's material parameters ``b, K, C``
 """
 
 import numpy as np
-import matplotlib.pyplot as plt
 import scipy.integrate
 from scipy.special import gamma
 import rainflow
 from tqdm import tqdm
 
 from . import tools
+
+
+def _import_pyplot(method):
+    """
+    Import ``matplotlib.pyplot`` on demand, so that matplotlib is needed only for plotting.
+
+    :param method: name of the calling method, used in the error message
+    """
+    try:
+        import matplotlib.pyplot as plt
+    except ImportError as e:
+        raise ImportError(f'matplotlib is required for {method}. Install it with `pip install matplotlib`.') from e
+    return plt
+
 
 class Spectrum:
     """Compute the ERS and FDS of a vibration signal for a range of natural
@@ -314,6 +327,8 @@ class Spectrum:
         :param grid: show grid (default: True)	
 
         """
+        plt = _import_pyplot('plot_ers')
+
         if hasattr(self, 'ers'):
             if new_figure:
                 plt.figure()
@@ -340,6 +355,8 @@ class Spectrum:
         """
         Plot the fatigue damage spectrum (FDS) of the signal
         """
+        plt = _import_pyplot('plot_fds')
+
         if hasattr(self, 'fds'):
             if new_figure:
                 plt.figure()
