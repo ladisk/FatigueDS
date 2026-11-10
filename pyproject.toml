@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "FatigueDS"
-version = "0.3.2"
+version = "1.0.0"
 maintainers = [
     { name = "Jaša Šonc", email = "jasa.sonc@fs.uni-lj.si" },
     { name = "Janko Slavič", email = "janko.slavic@fs.uni-lj.si" },
@@ -30,7 +30,7 @@ dependencies = [
     "FLife>=3.0.1",
 ]
 classifiers = [
-    "Development Status :: 4 - Beta",
+    "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",
     "Topic :: Scientific/Engineering",
     "Programming Language :: Python :: 3.10",
