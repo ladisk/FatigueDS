@@ -12,7 +12,9 @@ maintainers = [
     { name = "Janko Slavič", email = "janko.slavic@fs.uni-lj.si" },
 ]
 license = "MIT"
-license-files = ["License"]
+license-files = [
+    "License",
+]
 description = "Fatigue Damage Spectrum (FDS) and Extreme Response Spectrum (ERS)"
 readme = "README.rst"
 keywords = [
